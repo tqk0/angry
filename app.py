@@ -124,21 +124,21 @@ GAME_HTML = r"""
   .mode-tabs {
     margin-top: 12px;
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 4px;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
     padding: 4px;
     background: #0F131C;
     border: 1px solid rgba(255,255,255,0.12);
     border-radius: 8px;
   }
   .mode-tab {
-    padding: 7px 4px;
+    padding: 8px 6px;
     border: none;
     border-radius: 6px;
     background: transparent;
     color: #CBD5E1;
     font-family: 'DotGothic16', sans-serif;
-    font-size: 12px;
+    font-size: 13px;
     cursor: pointer;
   }
   .mode-tab.active {
@@ -215,7 +215,7 @@ GAME_HTML = r"""
       <span class="hud-sub" id="bestVal">BEST 0</span>
     </div>
     <div class="hud-col" style="text-align:center;">
-      <span class="hud-label" id="midLabel">のこり時間</span>
+      <span class="hud-label" id="midLabel">STAGE 1 草原</span>
       <span class="hud-val" id="timeVal">60s</span>
       <span class="hud-sub" id="levelVal">LV.1 おさんぽ</span>
     </div>
@@ -234,27 +234,40 @@ GAME_HTML = r"""
         <div class="kicker">3レーン・ランゲーム</div>
         <h2>怒りのレトリーバー！<br/>にんじんダッシュ</h2>
         <div class="mode-tabs">
-          <button class="mode-tab active" data-mode="meadow_60">草原 60秒</button>
-          <button class="mode-tab" data-mode="desert_60">砂漠 60秒</button>
+          <button class="mode-tab active" data-mode="standard">スタンダード</button>
           <button class="mode-tab" data-mode="endless">エンドレス</button>
         </div>
-        <div class="mode-meta" id="modeTitle">ステージ1：草原</div>
-        <div class="mode-sub" id="modeSub">60秒 · 段階レベルアップ · BEST 0</div>
-        <p id="modeDesc">指で左右にスライド（または矢印キー）して障害物をよけ、60秒間にんじんを集めよう！</p>
+        <div class="mode-meta" id="modeTitle">スタンダード（全2ステージ）</div>
+        <div class="mode-sub" id="modeSub">草原60秒 → クリアで砂漠60秒へ · BEST 0</div>
+        <p id="modeDesc">第1ステージ（草原60秒）をクリアすると、スコアを引き継いで第2ステージ（砂漠60秒）へ進めます！</p>
         <button id="startBtn" class="start-btn">ゲームスタート</button>
+      </div>
+    </div>
+
+    <div id="stageClearOverlay" class="overlay" style="display:none;">
+      <div class="card">
+        <div class="kicker">STAGE 1 草原 60秒完走！</div>
+        <h2>ステージ1 クリア！</h2>
+        <p style="margin-top:6px;">スコアを引き継いで、ライフ全回復で砂漠へ出発しよう！</p>
+        <div class="stats-box">
+          <div class="stat-row"><span>現在のスコア</span><strong id="scScore" style="color:#FDE073;">0</strong></div>
+          <div class="stat-row"><span>状況</span><span id="scDetail">0本 · ライフ ♥♥♥ 回復</span></div>
+        </div>
+        <button id="nextStageBtn" class="start-btn">第2ステージ：砂漠へすすむ</button>
+        <button id="scMenuBtn" class="secondary-btn">モード選択へもどる</button>
       </div>
     </div>
 
     <div id="endOverlay" class="overlay" style="display:none;">
       <div class="card">
-        <div class="kicker" id="endKicker">60秒完走！</div>
-        <h2 id="endTitle">ステージクリア！</h2>
+        <div class="kicker" id="endKicker">STAGE 2 砂漠も完走！</div>
+        <h2 id="endTitle">全ステージクリア！</h2>
         <div class="stats-box">
           <div class="stat-row"><span>スコア</span><strong id="endScore" style="color:#FDE073;">0</strong></div>
           <div class="stat-row"><span>ハイスコア</span><strong id="endBest">0</strong></div>
           <div class="stat-row"><span>結果</span><span id="endDetail">0本 · 1.0x</span></div>
         </div>
-        <button id="restartBtn" class="start-btn">もういちどあそぶ</button>
+        <button id="restartBtn" class="start-btn">STAGE 1からもういちど</button>
         <button id="menuBtn" class="secondary-btn">モード選択へもどる</button>
       </div>
     </div>
@@ -272,29 +285,20 @@ GAME_HTML = r"""
   const ROAD_W = CANVAS_W - GRASS_W * 2, LANE_W = ROAD_W / 3, PLAYER_Y = 456;
   const DURATION = 60, MAX_LIVES = 3, BASE_SPEED = 235;
   const BEST_KEYS = {
-    meadow_60: 'golden_carrot_dash_best_st',
-    desert_60: 'golden_carrot_dash_best_st_desert',
+    standard: 'golden_carrot_dash_best_st',
     endless: 'golden_carrot_dash_best_st_endless'
   };
 
   const MODE_INFO = {
-    meadow_60: {
-      title: 'ステージ1：草原',
-      sub: '60秒 · 段階レベルアップ',
-      desc: '指で左右にスライド（または矢印キー）して障害物をよけ、60秒間にんじんを集めよう！',
-      theme: 'meadow'
-    },
-    desert_60: {
-      title: 'ステージ2：砂漠',
-      sub: '60秒 · ピラミッド＆サボテン',
-      desc: 'サボテンや砂岩ブロックをよけながら、ピラミッドがそびえる砂漠を60秒走り抜けよう！',
-      theme: 'desert'
+    standard: {
+      title: 'スタンダード（全2ステージ）',
+      sub: '草原60秒 → クリアで砂漠60秒へ',
+      desc: '第1ステージ（草原60秒）をクリアすると、スコアを引き継いで第2ステージ（砂漠60秒）へ進めます！'
     },
     endless: {
-      title: 'エンドレスモード',
-      sub: '草原 · にんじんで無限加速',
-      desc: 'にんじんを取るほどスピードが無限に上昇！ライフが尽きるまで走り続けよう。',
-      theme: 'meadow'
+      title: 'エンドレス（草原・無限）',
+      sub: '10秒ごとにじわじわスピード上昇',
+      desc: '時間制限なしの草原ステージ！10秒ごとにじわじわスピードが上がっていきます。'
     }
   };
 
@@ -438,9 +442,10 @@ GAME_HTML = r"""
   const ctx = canvas.getContext('2d');
   const laneX = (l) => GRASS_W + LANE_W * l + LANE_W / 2;
 
-  let mode = 'meadow_60';
+  let mode = 'standard', stage = 1;
   function getBest(m) { return Number(localStorage.getItem(BEST_KEYS[m]) || '0'); }
   function setBest(m, val) { localStorage.setItem(BEST_KEYS[m], String(val)); }
+  function getTheme() { return (mode === 'standard' && stage === 2) ? 'desert' : 'meadow'; }
 
   let state = 'TITLE';
   let lane = 1, playerX = laneX(1), tilt = 0;
@@ -450,12 +455,12 @@ GAME_HTML = r"""
 
   function getDiff() {
     if (mode === 'endless') {
-      const speed = BASE_SPEED + carrots * 11;
-      const interval = Math.max(220, Math.round(800 - carrots * 10));
-      const dbl = Math.min(0.62, 0.1 + carrots * 0.012);
-      const lv = 1 + Math.floor(carrots / 8);
-      const labels = ['おさんぽ', 'かけあし', '本気ダッシュ', 'ぷんぷん猛走', '爆速モード', '限界突破'];
-      return { level: lv, label: labels[Math.min(labels.length - 1, lv - 1)], speed, interval, dbl, carrot: 0.66 };
+      const lv = 1 + Math.floor(Math.max(0, elapsed) / 10);
+      const speed = 225 + (lv - 1) * 32;
+      const interval = Math.max(290, 840 - (lv - 1) * 48);
+      const dbl = Math.min(0.52, 0.06 + (lv - 1) * 0.045);
+      const labels = ['おさんぽ', 'かけあし', 'リズム走', '本気ダッシュ', 'ぷんぷん猛走', '爆走モード', '限界突破'];
+      return { level: lv, label: labels[Math.min(labels.length - 1, lv - 1)], speed, interval, dbl, carrot: 0.64 };
     }
     return TIERS[Math.min(TIERS.length - 1, Math.floor(elapsed / 12))];
   }
@@ -481,7 +486,7 @@ GAME_HTML = r"""
       document.getElementById('timeVal').textContent = mult + 'x';
       document.getElementById('levelVal').textContent = 'LV.' + tier.level + ' · ' + Math.floor(elapsed) + 's';
     } else {
-      document.getElementById('midLabel').textContent = 'のこり時間';
+      document.getElementById('midLabel').textContent = 'STAGE ' + stage + (stage === 2 ? ' 砂漠' : ' 草原');
       document.getElementById('timeVal').textContent = Math.ceil(timeLeft) + 's';
       document.getElementById('levelVal').textContent = 'LV.' + tier.level + ' ' + tier.label;
     }
@@ -489,35 +494,70 @@ GAME_HTML = r"""
     document.getElementById('carrotVal').textContent = carrots + '本';
   }
 
-  function startGame() {
-    state = 'PLAYING';
+  function startFreshGame() {
+    state = 'PLAYING'; stage = 1;
     lane = 1; playerX = laneX(1); tilt = 0;
     invuln = 0; hurt = 0; anger = 1.1; elapsed = 0; timeLeft = DURATION;
     score = 0; carrots = 0; combo = 0; maxCombo = 0; lives = MAX_LIVES; level = 1;
     spawnMs = 250; lastSafeLane = 1; entities = []; texts = [];
-    banner = mode === 'endless' ? '無限加速！にんじんを集めろ！' : (mode === 'desert_60' ? '砂漠ステージ！ダッシュ！' : 'ダッシュ！にんじんを集めろ！');
-    bannerT = 1.4;
+    banner = mode === 'endless' ? 'エンドレス！10秒ごとに加速！' : 'STAGE 1 草原スタート！';
+    bannerT = 1.5;
     document.getElementById('titleOverlay').style.display = 'none';
+    document.getElementById('stageClearOverlay').style.display = 'none';
     document.getElementById('endOverlay').style.display = 'none';
     document.getElementById('touchControls').style.display = 'grid';
     [523,659,784,1046].forEach((n,i)=>tone(n,0.07,'square',0.07,i*0.06));
     syncHud();
   }
 
-  function endGame(cleared) {
-    state = cleared ? 'CLEAR' : 'OVER';
+  function advanceToDesert() {
+    state = 'PLAYING'; stage = 2;
+    lane = 1; playerX = laneX(1); tilt = 0;
+    invuln = 0; hurt = 0; anger = 1.2; elapsed = 0; timeLeft = DURATION;
+    lives = MAX_LIVES; level = 1;
+    spawnMs = 250; lastSafeLane = 1; entities = []; texts = [];
+    banner = 'STAGE 2 砂漠スタート！';
+    bannerT = 1.6;
+    document.getElementById('stageClearOverlay').style.display = 'none';
+    document.getElementById('touchControls').style.display = 'grid';
+    [523,659,784,1046].forEach((n,i)=>tone(n,0.07,'square',0.07,i*0.06));
+    syncHud();
+  }
+
+  function showStage1Clear() {
+    state = 'STAGE_CLEAR';
+    document.getElementById('touchControls').style.display = 'none';
+    document.getElementById('scScore').textContent = score.toLocaleString();
+    document.getElementById('scDetail').textContent = carrots + '本 · ライフ ♥♥♥ 回復';
+    document.getElementById('stageClearOverlay').style.display = 'flex';
+    [523,659,784,1046,784,1046].forEach((n,i)=>tone(n,0.1,'square',0.08,i*0.08));
+    syncHud();
+  }
+
+  function endGame(allCleared) {
+    state = allCleared ? 'ALL_CLEAR' : 'OVER';
     const tier = getDiff();
     const mult = (tier.speed / BASE_SPEED).toFixed(1);
     document.getElementById('touchControls').style.display = 'none';
-    document.getElementById('endKicker').textContent = cleared ? MODE_INFO[mode].title + ' 60秒完走！' : MODE_INFO[mode].title + ' · 障害物にぶつかった！';
-    document.getElementById('endTitle').textContent = cleared ? 'ステージクリア！' : 'ゲームオーバー';
+    document.getElementById('endKicker').textContent = allCleared ? 'STAGE 2 砂漠も完走！おめでとう！' : (mode === 'standard' ? 'STAGE ' + stage + (stage === 2 ? ' 砂漠' : ' 草原') + ' · 障害物にぶつかった！' : 'エンドレス · 障害物にぶつかった！');
+    document.getElementById('endTitle').textContent = allCleared ? '全ステージクリア！' : 'ゲームオーバー';
     document.getElementById('endScore').textContent = score.toLocaleString();
     document.getElementById('endBest').textContent = getBest(mode).toLocaleString();
     document.getElementById('endDetail').textContent = carrots + '本 · 速度 ' + mult + 'x · 最大' + maxCombo + 'コンボ';
+    document.getElementById('restartBtn').textContent = mode === 'standard' ? 'STAGE 1からもういちど' : 'もういちどあそぶ';
     document.getElementById('endOverlay').style.display = 'flex';
-    if (cleared) [523,659,784,1046,784,1046].forEach((n,i)=>tone(n,0.1,'square',0.08,i*0.08));
+    if (allCleared) [523,659,784,1046,784,1046].forEach((n,i)=>tone(n,0.1,'square',0.08,i*0.08));
     else [392,349,311,261].forEach((n,i)=>tone(n,0.14,'sawtooth',0.08,i*0.11));
     syncHud();
+  }
+
+  function returnToMenu() {
+    state = 'TITLE'; stage = 1;
+    score = 0; carrots = 0; combo = 0; lives = MAX_LIVES; elapsed = 0; timeLeft = DURATION;
+    document.getElementById('stageClearOverlay').style.display = 'none';
+    document.getElementById('endOverlay').style.display = 'none';
+    document.getElementById('titleOverlay').style.display = 'flex';
+    syncModeCard();
   }
 
   function moveLane(delta) {
@@ -538,17 +578,13 @@ GAME_HTML = r"""
   }
 
   document.querySelectorAll('.mode-tab').forEach(btn => {
-    btn.onclick = () => { mode = btn.dataset.mode; syncModeCard(); };
+    btn.onclick = () => { mode = btn.dataset.mode; stage = 1; syncModeCard(); };
   });
-  document.getElementById('startBtn').onclick = startGame;
-  document.getElementById('restartBtn').onclick = startGame;
-  document.getElementById('menuBtn').onclick = () => {
-    state = 'TITLE';
-    score = 0; carrots = 0; combo = 0; lives = MAX_LIVES; elapsed = 0; timeLeft = DURATION;
-    document.getElementById('endOverlay').style.display = 'none';
-    document.getElementById('titleOverlay').style.display = 'flex';
-    syncModeCard();
-  };
+  document.getElementById('startBtn').onclick = startFreshGame;
+  document.getElementById('nextStageBtn').onclick = advanceToDesert;
+  document.getElementById('restartBtn').onclick = startFreshGame;
+  document.getElementById('scMenuBtn').onclick = returnToMenu;
+  document.getElementById('menuBtn').onclick = returnToMenu;
   document.getElementById('leftBtn').onclick = () => moveLane(-1);
   document.getElementById('centerBtn').onclick = () => jumpLane(1);
   document.getElementById('rightBtn').onclick = () => moveLane(1);
@@ -560,7 +596,10 @@ GAME_HTML = r"""
   window.addEventListener('keydown', (e) => {
     if (e.key === 'ArrowLeft' || e.key === 'a') { e.preventDefault(); moveLane(-1); }
     else if (e.key === 'ArrowRight' || e.key === 'd') { e.preventDefault(); moveLane(1); }
-    else if ((e.key === ' ' || e.key === 'Enter') && state !== 'PLAYING') { e.preventDefault(); startGame(); }
+    else if (e.key === ' ' || e.key === 'Enter') {
+      if (state === 'STAGE_CLEAR') { e.preventDefault(); advanceToDesert(); }
+      else if (state !== 'PLAYING') { e.preventDefault(); startFreshGame(); }
+    }
   });
 
   let swActive = false, swId = -1, swStart = 0, swStep = 0, swMoved = 0;
@@ -589,7 +628,7 @@ GAME_HTML = r"""
   });
 
   function spawnWave(tier) {
-    const obs = MODE_INFO[mode].theme === 'desert' ? ['cactus', 'sandstone', 'sand_spike'] : ['brick', 'pipe', 'chestnut'];
+    const obs = getTheme() === 'desert' ? ['cactus', 'sandstone', 'sand_spike'] : ['brick', 'pipe', 'chestnut'];
     const lanes = [0, 1, 2];
     const reachable = lanes.filter(l => Math.abs(l - lastSafeLane) <= 1);
     const safe = reachable[Math.floor(Math.random() * reachable.length)];
@@ -597,7 +636,7 @@ GAME_HTML = r"""
     const blocked = lanes.filter(l => l !== safe);
     if (Math.random() < tier.dbl) {
       blocked.forEach(bl => entities.push({ kind: obs[Math.floor(Math.random()*3)], lane: bl, y: SKY_H - 36, bob: Math.random()*6 }));
-      if (Math.random() < (mode === 'endless' ? 0.85 : 0.78)) entities.push({ kind: Math.random() < 0.14 ? 'gold' : 'carrot', lane: safe, y: SKY_H - 64, bob: Math.random()*6 });
+      if (Math.random() < 0.8) entities.push({ kind: Math.random() < 0.14 ? 'gold' : 'carrot', lane: safe, y: SKY_H - 64, bob: Math.random()*6 });
     } else {
       let obLane = null;
       if (Math.random() < 0.78) {
@@ -645,7 +684,7 @@ GAME_HTML = r"""
         [440,554,659,880].forEach((n,i)=>tone(n,0.08,'square',0.07,i*0.065));
       }
       scroll = (scroll + dt * tier.speed) % 64;
-      runT += dt * (8 + Math.min(10, level * 1.6));
+      runT += dt * (8 + Math.min(10, level * 1.5));
       if (invuln > 0) invuln = Math.max(0, invuln - dt);
       if (hurt > 0) hurt = Math.max(0, hurt - dt);
       if (anger > 0) anger = Math.max(0, anger - dt);
@@ -690,16 +729,17 @@ GAME_HTML = r"""
       entities = entities.filter(e => !e.dead && e.y < CANVAS_H + 50);
       texts = texts.filter(t => { t.y -= 38 * dt; t.l -= dt; return t.l > 0; });
 
-      if (mode !== 'endless' && timeLeft <= 0 && state === 'PLAYING') {
+      if (mode === 'standard' && timeLeft <= 0 && state === 'PLAYING') {
         score += lives * 500;
         if (score > getBest(mode)) setBest(mode, score);
-        endGame(true);
+        if (stage === 1) showStage1Clear();
+        else endGame(true);
       }
       hudT += dt;
       if (hudT >= 0.08) { hudT = 0; syncHud(); }
     }
 
-    const theme = MODE_INFO[mode].theme;
+    const theme = getTheme();
     ctx.imageSmoothingEnabled = false;
     if (theme === 'desert') {
       ctx.fillStyle = '#F2A65A'; ctx.fillRect(0, 0, CANVAS_W, SKY_H - 22);
@@ -805,3 +845,4 @@ GAME_HTML = r"""
 """
 
 components.html(GAME_HTML, height=740, scrolling=False)
+
