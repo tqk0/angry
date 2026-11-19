@@ -215,9 +215,9 @@ GAME_HTML = r"""
       <span class="hud-sub" id="bestVal">BEST 0</span>
     </div>
     <div class="hud-col" style="text-align:center;">
-      <span class="hud-label" id="midLabel">STAGE 1 草原</span>
-      <span class="hud-val" id="timeVal">60s</span>
-      <span class="hud-sub" id="levelVal">LV.1 おさんぽ</span>
+      <span class="hud-label" id="midLabel">STAGE 1/8 平原</span>
+      <span class="hud-val" id="timeVal">45s</span>
+      <span class="hud-sub" id="levelVal">速度 1.0x · かけだし</span>
     </div>
     <div class="hud-col" style="text-align:right;">
       <span class="hud-label">ライフ / 🥕</span>
@@ -237,31 +237,31 @@ GAME_HTML = r"""
           <button class="mode-tab active" data-mode="standard">スタンダード</button>
           <button class="mode-tab" data-mode="endless">エンドレス</button>
         </div>
-        <div class="mode-meta" id="modeTitle">スタンダード（全2ステージ）</div>
-        <div class="mode-sub" id="modeSub">草原60秒 → クリアで砂漠60秒へ · BEST 0</div>
-        <p id="modeDesc">第1ステージ（草原60秒）をクリアすると、スコアを引き継いで第2ステージ（砂漠60秒）へ進めます！</p>
+        <div class="mode-meta" id="modeTitle">スタンダード（全8ステージ）</div>
+        <div class="mode-sub" id="modeSub">各45秒 · ステージごとにスピードUP · BEST 0</div>
+        <p id="modeDesc">平原から溶岩城まで全8ステージ（各45秒）！ステージが進むほどスピードが上がります。</p>
         <button id="startBtn" class="start-btn">ゲームスタート</button>
       </div>
     </div>
 
     <div id="stageClearOverlay" class="overlay" style="display:none;">
       <div class="card">
-        <div class="kicker">STAGE 1 草原 60秒完走！</div>
-        <h2>ステージ1 クリア！</h2>
-        <p style="margin-top:6px;">スコアを引き継いで、ライフ全回復で砂漠へ出発しよう！</p>
+        <div class="kicker" id="scKicker">STAGE 1/8 平原 45秒完走！</div>
+        <h2 id="scTitle">ステージ1 クリア！</h2>
+        <p id="scDesc" style="margin-top:6px;">スコアを引き継いで、ライフ全回復で次のステージへ！</p>
         <div class="stats-box">
           <div class="stat-row"><span>現在のスコア</span><strong id="scScore" style="color:#FDE073;">0</strong></div>
           <div class="stat-row"><span>状況</span><span id="scDetail">0本 · ライフ ♥♥♥ 回復</span></div>
         </div>
-        <button id="nextStageBtn" class="start-btn">第2ステージ：砂漠へすすむ</button>
+        <button id="nextStageBtn" class="start-btn">STAGE 2：砂漠へすすむ</button>
         <button id="scMenuBtn" class="secondary-btn">モード選択へもどる</button>
       </div>
     </div>
 
     <div id="endOverlay" class="overlay" style="display:none;">
       <div class="card">
-        <div class="kicker" id="endKicker">STAGE 2 砂漠も完走！</div>
-        <h2 id="endTitle">全ステージクリア！</h2>
+        <div class="kicker" id="endKicker">STAGE 8 溶岩城も突破！</div>
+        <h2 id="endTitle">全8ステージ制覇！</h2>
         <div class="stats-box">
           <div class="stat-row"><span>スコア</span><strong id="endScore" style="color:#FDE073;">0</strong></div>
           <div class="stat-row"><span>ハイスコア</span><strong id="endBest">0</strong></div>
@@ -283,7 +283,7 @@ GAME_HTML = r"""
 (() => {
   const CANVAS_W = 360, CANVAS_H = 560, SKY_H = 76, GRASS_W = 48;
   const ROAD_W = CANVAS_W - GRASS_W * 2, LANE_W = ROAD_W / 3, PLAYER_Y = 456;
-  const DURATION = 60, MAX_LIVES = 3, BASE_SPEED = 235;
+  const DURATION = 45, TOTAL_STAGES = 8, MAX_LIVES = 3, BASE_SPEED = 235;
   const BEST_KEYS = {
     standard: 'golden_carrot_dash_best_st',
     endless: 'golden_carrot_dash_best_st_endless'
@@ -291,23 +291,26 @@ GAME_HTML = r"""
 
   const MODE_INFO = {
     standard: {
-      title: 'スタンダード（全2ステージ）',
-      sub: '草原60秒 → クリアで砂漠60秒へ',
-      desc: '第1ステージ（草原60秒）をクリアすると、スコアを引き継いで第2ステージ（砂漠60秒）へ進めます！'
+      title: 'スタンダード（全8ステージ）',
+      sub: '各45秒 · ステージごとにスピードUP',
+      desc: '平原から溶岩城まで全8ステージ（各45秒）！ステージが進むほどスピードが上がります。'
     },
     endless: {
       title: 'エンドレス（草原・無限）',
-      sub: '10秒ごとにじわじわスピード上昇',
-      desc: '時間制限なしの草原ステージ！10秒ごとにじわじわスピードが上がっていきます。'
+      sub: 'Lv.5まで5秒ごと · 以降10秒ごと加速',
+      desc: '時間制限なしの草原ステージ！Lv.5まで5秒ごと、以降は10秒ごとにスピードが上がり続けます。'
     }
   };
 
-  const TIERS = [
-    { level: 1, label: 'おさんぽ', speed: 235, interval: 820, dbl: 0.08, carrot: 0.62 },
-    { level: 2, label: 'かけあし', speed: 295, interval: 690, dbl: 0.22, carrot: 0.56 },
-    { level: 3, label: '本気ダッシュ', speed: 360, interval: 575, dbl: 0.36, carrot: 0.52 },
-    { level: 4, label: 'ぷんぷん猛走', speed: 430, interval: 475, dbl: 0.48, carrot: 0.48 },
-    { level: 5, label: '鬼ごっこMAX', speed: 505, interval: 395, dbl: 0.60, carrot: 0.45 },
+  const STAGES = [
+    { stage: 1, theme: 'meadow', name: '平原', baseSpeed: 235, step: 30, interval: 800, dbl: 0.08, obs: ['brick', 'pipe', 'chestnut'] },
+    { stage: 2, theme: 'desert', name: '砂漠', baseSpeed: 260, step: 30, interval: 740, dbl: 0.14, obs: ['cactus', 'sandstone', 'sand_spike'] },
+    { stage: 3, theme: 'island', name: '海島', baseSpeed: 285, step: 30, interval: 685, dbl: 0.18, obs: ['coral', 'palm_log', 'urchin'] },
+    { stage: 4, theme: 'snow', name: '雪山', baseSpeed: 310, step: 30, interval: 635, dbl: 0.22, obs: ['ice_block', 'snowman', 'frost_spike'] },
+    { stage: 5, theme: 'jungle', name: 'ジャングル', baseSpeed: 335, step: 30, interval: 590, dbl: 0.27, obs: ['vine_log', 'piranha', 'totem'] },
+    { stage: 6, theme: 'mountain', name: '山脈', baseSpeed: 360, step: 30, interval: 550, dbl: 0.32, obs: ['boulder', 'iron_fence', 'rock_crab'] },
+    { stage: 7, theme: 'cloud', name: '雲海', baseSpeed: 385, step: 30, interval: 515, dbl: 0.36, obs: ['thunder_cloud', 'wing_block', 'sky_spike'] },
+    { stage: 8, theme: 'castle', name: '溶岩城', baseSpeed: 415, step: 35, interval: 475, dbl: 0.42, obs: ['castle_brick', 'lava_fire', 'spiky_ball'] }
   ];
 
   const PAL = {
@@ -317,21 +320,24 @@ GAME_HTML = r"""
     P:'#FCA5A5', O:'#FF6B1A', Y:'#FFA834', C:'#B44309', V:'#22C55E', F:'#15803D', I:'#0D5229',
     B:'#C84C0C', H:'#FC9838', N:'#00A800', S:'#80D010', E:'#005800', T:'#9E4718',
     U:'#D97724', Z:'#FDE68A', A:'#F59E0B', X:'#B45309',
-    j:'#F3B36C', m:'#D97736', n:'#8C4216', s:'#C26D3A', t:'#E69F66'
+    j:'#F3B36C', m:'#D97736', n:'#8C4216', s:'#C26D3A', t:'#E69F66',
+    a:'#FB7185', b:'#2563EB', c:'#38BDF8', f:'#0284C7', h:'#BAE6FD',
+    i:'#334155', o:'#94A3B8', q:'#CBD5E1', u:'#6D28D9', v:'#A78BFA',
+    x:'#64748B', z:'#78350F', J:'#166534'
   };
 
   function mkSprite(rows, sc) {
     const c = document.createElement('canvas');
     c.width = rows[0].length * sc;
     c.height = rows.length * sc;
-    const x = c.getContext('2d');
-    x.imageSmoothingEnabled = false;
+    const ctx = c.getContext('2d');
+    ctx.imageSmoothingEnabled = false;
     for (let r = 0; r < rows.length; r++) {
       for (let col = 0; col < rows[r].length; col++) {
         const ch = rows[r][col];
         if (ch !== '.' && PAL[ch]) {
-          x.fillStyle = PAL[ch];
-          x.fillRect(col * sc, r * sc, sc, sc);
+          ctx.fillStyle = PAL[ch];
+          ctx.fillRect(col * sc, r * sc, sc, sc);
         }
       }
     }
@@ -413,6 +419,114 @@ GAME_HTML = r"""
       '.KWtssssssssstWK','KKtKKssssssKKtKK','KtKWKKssssKKWKtK','KssWWKssssKWWssK',
       'KssssssssssssssK','KsssnnnnnnnnsssK','.KssnnKKKKnnssK.','..KKnnnnnnnnKK..',
       '...KKKKKKKKKK...','..KnnK....KnnK..','..KKKK....KKKK..','................'
+    ], 3),
+    coral: mkSprite([
+      '...KK......KK...','..KOOOK..KaaWK..','..KOaaK..KaaaK..','...KaaKKKKaaK...',
+      '.KKKaaaaOaaaKK..','KOOaaaaaaaWaaOK.','KOaaaaaaaaaaaRK.','.KKKaaRRRRaaKK..',
+      '...KaaRRRRaaK...','...KaaRRRRaaK...','..KaaRRRRRRaaK..','..KaaRRRRRRaaK..',
+      '..KRRRRRRRRRRK..','.KKRRRRRRRRRRKK.','KZZZZRRRRRRZZZZK','KKKKKKKKKKKKKKKK'
+    ], 3),
+    palm_log: mkSprite([
+      '..KKKK....KKKK..','.KSSNNKKKKNNSSK.','KSNNNNKKKKNNNNSK','.KKKKzUUUUzKKKK.',
+      '....KzZZUUUzK...','....KzUUzzUzK...','....KzZZZZzzK...','....KzUUUzzUK...',
+      '....KzZZUUzzK...','....KzUUzzUzK...','....KzZZZZzzK...','....KzUUUzzUK...',
+      '....KzZZUUzzK...','...KKzUUUUzzKK..','..KZZZZZZZZZZZK.','..KKKKKKKKKKKKK.'
+    ], 3),
+    urchin: mkSprite([
+      '.......KK.......','..KK..KWWK..KK..','.KvvK.KvvK.KvvK.','..KuvKKuuKKvuK..',
+      'KK.KuuuuuuuuK.KK','KWvuuuuuuuuuuvWK','.KKuuKWKKWKuuKK.','...uuKWWKWWuu...',
+      '.KKuuKKKKKKuuKK.','KvvuuuuuuuuuuvvK','KK.KuuuuuuuuK.KK','..KuvKKuuKKvuK..',
+      '.KvvK.KvvK.KvvK.','..KK..KWWK..KK..','.......KK.......','................'
+    ], 3),
+    ice_block: mkSprite([
+      'KKKKKKKKKKKKKKKK','KWWWWWWWWWWWhhhK','KWhhhccccccchhfK','KWhccccccccchffK',
+      'KWccWWcccccchffK','KWcWccchcccchffK','KWhccccchccchffK','KWhccccccchcbffK',
+      'KWhccWWccccbbffK','KWhcWccchccbbffK','KWhccccchccbbffK','KWhhhhhhhhhbbbfK',
+      'KffccccccbbbbbfK','KffffffffbbbbbfK','KbbbbbbbbbbbbbfK','KKKKKKKKKKKKKKKK'
+    ], 3),
+    snowman: mkSprite([
+      '.....KKKKKK.....','....KiiiiiiK....','....KiiiiiiK....','..KKKKKKKKKKKK..',
+      '...KWWWWWWWWK...','..KWWKKWWKKWWK..','..KWWKeWWKeWWK..','..KWWWWOOOWWWK..',
+      '..KqqWWWWWWqqK..','...KKRRRRRRKK...','..KWWWWeeWWWWK..','.KWWWWWWWWWWWWK.',
+      '.KWWqqWeeWWqqWK.','..KqqqqqqqqqqK..','...KKKKKKKKKK...','................'
+    ], 3),
+    frost_spike: mkSprite([
+      '.......KK.......','......KWWK......','.....KWhhWK.....','....KWhcchfK....',
+      '..KKKWhcchfKKK..','.KWhKWccchfKhfK.','.KWhccchccchffK.','.KWhKWcKKcfKhfK.',
+      'KWhcKWWKKWWKchfK','KWhcchccccchbbfK','KWhccccccccbbffK','KfffccccccbbbffK',
+      '.KfffbbbbbbfffK.','..KKbbbbbbbbKK..','...KKKKKKKKKK...','................'
+    ], 3),
+    vine_log: mkSprite([
+      'KKKKKKKKKKKKKKKK','KTUUUTTTTTSSSTTK','KTTzzTTTSSJJSzTK','KUUUUzTTJJSSTUTK',
+      'KTzzUUUTSSJzzTTK','KTTTTzTSJJzTTTUK','KSSTTUUJJTTTzzTK','KJJSSzTTTTTTTTTK',
+      'KTJJSSUUUTzzUTTK','KTTJJSSzTTTUUUTK','KUUUTJJSSzzTTTTK','KTzzTTTJJSSUUUTK',
+      'KTTTTzTTTJJSSzTK','KUUUUUzzTTTJJSSK','KzzzzzzzzzTTTJJK','KKKKKKKKKKKKKKKK'
+    ], 3),
+    piranha: mkSprite([
+      '....KKKKKKKK....','..KKRRRRWRRRKK..','.KRRWRRRRRRWRRK.','KRRRRRRRWWWRRRRK',
+      'KRRWRRKWWWKRRRRK','KRRRRKPPPPPKRRRK','.KRRKWWKKKWWKRK.','..KKK.KJJJK.KKK.',
+      '......KNNNK.....','..KKKKKNNNKKKKK.','.KSSSSKNNNKSSSSK','KSSJJJKKKKKJJJSS',
+      '.KKKK.KNNNK.KKKK','......KJJJK.....','.....KKJJJKK....','....KKKKKKKKK...'
+    ], 3),
+    totem: mkSprite([
+      '..KKKKKKKKKKKK..','.KoooxxxxxJxxxK.','.KoxxxxxxxxxJJK.','.KoxKKKxxKKKxJK.',
+      '.KoxKyyxxKyyxJK.','.KoxKKKxxKKKxxK.','.KoxxxxxxxxxxxK.','.KoxxKKKKKKKxxK.',
+      '.KoxKWWKWKWWKxK.','.KoxKKKKKKKKKxK.','.KoxxxxxJxxxxxK.','.KJxxxxJJJxxxxK.',
+      '.KJJxxiiiiixxxK.','.KiiiiiiiiiJJxK.','KiiiiiiiiiiiiiiK','KKKKKKKKKKKKKKKK'
+    ], 3),
+    boulder: mkSprite([
+      '....KKKKKKKK....','..KKqqqooooiKK..','.KqqooooooiiiiK.','KqqoooKKooooiiiK',
+      'KqoooKooKoooiiiK','KoooqqqqooooKKiK','KoooKoooooooKiiK','KooiKooqqqooKiiK',
+      'KiiiKKooooooKiiK','KiiiiiooKKiiiiiK','.KiiiiKiiiiiiiK.','.KiiiiiiKiiiiKK.',
+      '..KiiiiiiiiiiK..','..KKiiiiiiiiKK..','....KKKKKKKK....','................'
+    ], 3),
+    iron_fence: mkSprite([
+      '..KK...KK...KK..','.KWWK.KWWK.KWWK.','.KqqK.KqqK.KqqK.','KKKKKKKKKKKKKKKK',
+      'KyyyyiiiiyyyyiiK','KiiyyyyiiiiyyyyK','KKKKKKKKKKKKKKKK','.KqqK.KqqK.KqqK.',
+      '.KoiK.KoiK.KoiK.','KKKKKKKKKKKKKKKK','KoooooooKooooooK','KiiiiiiiKiiiiiiK',
+      'KKKKKKKKKKKKKKKK','.KoiK......KoiK.','.KiiK......KiiK.','.KKKK......KKKK.'
+    ], 3),
+    rock_crab: mkSprite([
+      '.......KK.......','.....KKooKK.....','...KKqqooooKK...','..KqqooooooooK..',
+      '.KqqooiiiiiooiK.','KqqoKKiiiiiiKKiK','KooKWKKiiiiKKWKi','KooKWWKiiiiKWWKi',
+      'KiiiiiiiiiiiiiiK','KOOKiiiiiiiiKOOK','KOOoKiiiiiiKoOOK','.KK.KKKKKKKK.KK.',
+      '...KiiK..KiiK...','..KiiK....KiiK..','..KKKK....KKKK..','................'
+    ], 3),
+    thunder_cloud: mkSprite([
+      '....KKKKKKKK....','..KKqqqqooooKK..','.KqqqqooooooiiK.','KqqKKooooKKoooiK',
+      'KqKWWRooKWWKooiK','KqooooooioooooiK','KooiiiiiiiiiiiK.','.KKKKKKKKKKKKKK.',
+      '.....KKyyKK.....','....KyyyyK......','...KyyyyAAK.....','.....KyyAAK.....',
+      '....KyyAAK......','...KyyAK........','...KAK..........','...KK...........'
+    ], 3),
+    wing_block: mkSprite([
+      '................','................','....KKKKKKKK....','KK..KZZZZZZK..KK',
+      'KWKKKZAAAAZK.KWK','KWWWKZAWWAZKKWWK','KWqWKZAAWAZKKWqK','.KKqKZAAZZZKKqK.',
+      '..KKKZAAWAZKKK..','....KZAAAAZK....','....KZAXXAXK....','....KXXXXXXK....',
+      '....KKKKKKKK....','................','................','................'
+    ], 3),
+    sky_spike: mkSprite([
+      '.......KK.......','......KRRK......','....KKWWWWKK....','..KKWWWWWWqqKK..',
+      '.KRWqqWWWWqqWRK.','KKRKKWWWWWWKKRKK','KqKWKKWWWWKKWKqK','KqKWWKWWWWKWWKqK',
+      'KqqqqqqqqqqqqqqK','KqqcccccccccqqqK','.KqqccKKKKccqqK.','..KKccccccccKK..',
+      '...KKKKKKKKKK...','..KccK....KccK..','..KKKK....KKKK..','................'
+    ], 3),
+    castle_brick: mkSprite([
+      'KKKKKKKKKKKKKKKK','KoooooooKooooooK','KoiiiiiiKoiiiiiK','KoiiiiiiKoiiiiiK',
+      'KKKKKKKKKKKKKKKK','KoooKoooooooKooK','KiiiKiiiiiiiKiiK','KiiiKiiiiiiiKiiK',
+      'KKKKKKKKKKKKKKKK','KoooooooKooooooK','KoiiiiiiKoiiiiiK','KoiiiiiiKoiiiiiK',
+      'KKKKKKKKKKKKKKKK','KoooKoooooooKooK','KiiiKiiiiiiiKiiK','KKKKKKKKKKKKKKKK'
+    ], 3),
+    lava_fire: mkSprite([
+      '.......KK.......','......KRRK......','.....KROORK.....','....KROyyORK....',
+      '...KROyyyyORK...','..KROyyWWyyORK..','..KRyyWWWWyyRK..','.KROyyWWWWyyORK.',
+      '.KROyyyyyyyyORK.','.KROyyKKKKyyORK.','..KROyyyyyyORK..','..KRROyyyyORRK..',
+      '...KRRROORRRK...','....KKRRRRKK....','......KKKK......','................'
+    ], 3),
+    spiky_ball: mkSprite([
+      '.......KK.......','..KK..KWWK..KK..','.KqqK.KqqK.KqqK.','..KiqKKiiKKqiK..',
+      'KK.KiiiiiiiiK.KK','KWqiiiiiiiiiiqWK','.KKiiKRRKKRRiKK.','...iiKRyKiyRK...',
+      '.KKiiKKKKKKiiKK.','KqqiiiiiiiiiiqqK','KK.KiiiiiiiiK.KK','..KiqKKiiKKqiK..',
+      '.KqqK.KqqK.KqqK.','..KK..KWWK..KK..','.......KK.......','................'
     ], 3)
   };
 
@@ -445,7 +559,8 @@ GAME_HTML = r"""
   let mode = 'standard', stage = 1;
   function getBest(m) { return Number(localStorage.getItem(BEST_KEYS[m]) || '0'); }
   function setBest(m, val) { localStorage.setItem(BEST_KEYS[m], String(val)); }
-  function getTheme() { return (mode === 'standard' && stage === 2) ? 'desert' : 'meadow'; }
+  function getStageCfg(s) { return STAGES[s - 1] || STAGES[0]; }
+  function getTheme() { return mode === 'endless' ? 'meadow' : getStageCfg(stage).theme; }
 
   let state = 'TITLE';
   let lane = 1, playerX = laneX(1), tilt = 0;
@@ -453,16 +568,31 @@ GAME_HTML = r"""
   let elapsed = 0, timeLeft = DURATION, score = 0, carrots = 0, combo = 0, maxCombo = 0, lives = MAX_LIVES, level = 1;
   let spawnMs = 250, lastSafeLane = 1, entities = [], texts = [], banner = '', bannerT = 0;
 
+  function getStreakMult(c) {
+    return Math.min(2.0, Math.round((1 + Math.floor(Math.max(0, c) / 5) * 0.2) * 10) / 10);
+  }
+
   function getDiff() {
     if (mode === 'endless') {
-      const lv = 1 + Math.floor(Math.max(0, elapsed) / 10);
-      const speed = 225 + (lv - 1) * 32;
-      const interval = Math.max(290, 840 - (lv - 1) * 48);
-      const dbl = Math.min(0.52, 0.06 + (lv - 1) * 0.045);
+      const t = Math.max(0, elapsed);
+      const lv = t < 20 ? 1 + Math.floor(t / 5) : 5 + Math.floor((t - 20) / 10);
+      const speed = 250 + (lv - 1) * 28;
+      const interval = Math.max(270, 780 - (lv - 1) * 42);
+      const dbl = Math.min(0.54, 0.08 + (lv - 1) * 0.045);
       const labels = ['おさんぽ', 'かけあし', 'リズム走', '本気ダッシュ', 'ぷんぷん猛走', '爆走モード', '限界突破'];
       return { level: lv, label: labels[Math.min(labels.length - 1, lv - 1)], speed, interval, dbl, carrot: 0.64 };
     }
-    return TIERS[Math.min(TIERS.length - 1, Math.floor(elapsed / 12))];
+    const cfg = getStageCfg(stage);
+    const phase = Math.min(2, Math.floor(Math.max(0, elapsed) / 15));
+    const phaseLabels = ['かけだし', '加速中', 'ラストスパート'];
+    return {
+      level: phase + 1,
+      label: phaseLabels[phase],
+      speed: cfg.baseSpeed + phase * cfg.step,
+      interval: Math.max(275, cfg.interval - phase * 70),
+      dbl: Math.min(0.62, cfg.dbl + phase * 0.1),
+      carrot: Math.max(0.46, 0.62 - (stage - 1) * 0.015 - phase * 0.02)
+    };
   }
 
   function syncModeCard() {
@@ -479,6 +609,7 @@ GAME_HTML = r"""
   function syncHud() {
     const tier = getDiff();
     const mult = (tier.speed / BASE_SPEED).toFixed(1);
+    const cfg = getStageCfg(stage);
     document.getElementById('scoreVal').textContent = score.toLocaleString();
     document.getElementById('bestVal').textContent = 'BEST ' + getBest(mode).toLocaleString();
     if (mode === 'endless') {
@@ -486,12 +617,13 @@ GAME_HTML = r"""
       document.getElementById('timeVal').textContent = mult + 'x';
       document.getElementById('levelVal').textContent = 'LV.' + tier.level + ' · ' + Math.floor(elapsed) + 's';
     } else {
-      document.getElementById('midLabel').textContent = 'STAGE ' + stage + (stage === 2 ? ' 砂漠' : ' 草原');
+      document.getElementById('midLabel').textContent = 'STAGE ' + stage + '/' + TOTAL_STAGES + ' ' + cfg.name;
       document.getElementById('timeVal').textContent = Math.ceil(timeLeft) + 's';
-      document.getElementById('levelVal').textContent = 'LV.' + tier.level + ' ' + tier.label;
+      document.getElementById('levelVal').textContent = '速度 ' + mult + 'x · ' + tier.label;
     }
     document.getElementById('livesVal').textContent = '♥'.repeat(Math.max(0, lives)) + '♡'.repeat(Math.max(0, MAX_LIVES - lives));
-    document.getElementById('carrotVal').textContent = carrots + '本';
+    const sm = getStreakMult(combo);
+    document.getElementById('carrotVal').textContent = carrots + '本' + (sm > 1 ? ' · x' + sm.toFixed(1) : '');
   }
 
   function startFreshGame() {
@@ -500,7 +632,7 @@ GAME_HTML = r"""
     invuln = 0; hurt = 0; anger = 1.1; elapsed = 0; timeLeft = DURATION;
     score = 0; carrots = 0; combo = 0; maxCombo = 0; lives = MAX_LIVES; level = 1;
     spawnMs = 250; lastSafeLane = 1; entities = []; texts = [];
-    banner = mode === 'endless' ? 'エンドレス！10秒ごとに加速！' : 'STAGE 1 草原スタート！';
+    banner = mode === 'endless' ? 'エンドレス！Lv.5まで5秒ごと加速！' : 'STAGE 1 平原スタート！';
     bannerT = 1.5;
     document.getElementById('titleOverlay').style.display = 'none';
     document.getElementById('stageClearOverlay').style.display = 'none';
@@ -510,13 +642,15 @@ GAME_HTML = r"""
     syncHud();
   }
 
-  function advanceToDesert() {
-    state = 'PLAYING'; stage = 2;
+  function advanceToNextStage() {
+    stage = Math.min(TOTAL_STAGES, stage + 1);
+    const cfg = getStageCfg(stage);
+    state = 'PLAYING';
     lane = 1; playerX = laneX(1); tilt = 0;
     invuln = 0; hurt = 0; anger = 1.2; elapsed = 0; timeLeft = DURATION;
     lives = MAX_LIVES; level = 1;
     spawnMs = 250; lastSafeLane = 1; entities = []; texts = [];
-    banner = 'STAGE 2 砂漠スタート！';
+    banner = 'STAGE ' + stage + ' ' + cfg.name + 'スタート！';
     bannerT = 1.6;
     document.getElementById('stageClearOverlay').style.display = 'none';
     document.getElementById('touchControls').style.display = 'grid';
@@ -524,11 +658,18 @@ GAME_HTML = r"""
     syncHud();
   }
 
-  function showStage1Clear() {
+  function showStageClear() {
     state = 'STAGE_CLEAR';
+    const curCfg = getStageCfg(stage);
+    const nxtCfg = getStageCfg(stage + 1);
+    const nxtSpeed = (nxtCfg.baseSpeed / BASE_SPEED).toFixed(1);
     document.getElementById('touchControls').style.display = 'none';
+    document.getElementById('scKicker').textContent = 'STAGE ' + stage + '/' + TOTAL_STAGES + ' ' + curCfg.name + ' 45秒完走！';
+    document.getElementById('scTitle').textContent = 'ステージ' + stage + ' クリア！';
+    document.getElementById('scDesc').textContent = 'スコアを引き継いで、ライフ全回復で次は「' + nxtCfg.name + '」（初速 ' + nxtSpeed + 'x）へ！';
     document.getElementById('scScore').textContent = score.toLocaleString();
     document.getElementById('scDetail').textContent = carrots + '本 · ライフ ♥♥♥ 回復';
+    document.getElementById('nextStageBtn').textContent = 'STAGE ' + (stage + 1) + '：' + nxtCfg.name + 'へすすむ';
     document.getElementById('stageClearOverlay').style.display = 'flex';
     [523,659,784,1046,784,1046].forEach((n,i)=>tone(n,0.1,'square',0.08,i*0.08));
     syncHud();
@@ -538,12 +679,13 @@ GAME_HTML = r"""
     state = allCleared ? 'ALL_CLEAR' : 'OVER';
     const tier = getDiff();
     const mult = (tier.speed / BASE_SPEED).toFixed(1);
+    const cfg = getStageCfg(stage);
     document.getElementById('touchControls').style.display = 'none';
-    document.getElementById('endKicker').textContent = allCleared ? 'STAGE 2 砂漠も完走！おめでとう！' : (mode === 'standard' ? 'STAGE ' + stage + (stage === 2 ? ' 砂漠' : ' 草原') + ' · 障害物にぶつかった！' : 'エンドレス · 障害物にぶつかった！');
-    document.getElementById('endTitle').textContent = allCleared ? '全ステージクリア！' : 'ゲームオーバー';
+    document.getElementById('endKicker').textContent = allCleared ? 'STAGE 8 溶岩城も突破！おめでとう！' : (mode === 'standard' ? 'STAGE ' + stage + '/' + TOTAL_STAGES + ' ' + cfg.name + ' · 障害物にぶつかった！' : 'エンドレス · 障害物にぶつかった！');
+    document.getElementById('endTitle').textContent = allCleared ? '全8ステージ制覇！' : 'ゲームオーバー';
     document.getElementById('endScore').textContent = score.toLocaleString();
     document.getElementById('endBest').textContent = getBest(mode).toLocaleString();
-    document.getElementById('endDetail').textContent = carrots + '本 · 速度 ' + mult + 'x · 最大' + maxCombo + 'コンボ';
+    document.getElementById('endDetail').textContent = carrots + '本 · 速度 ' + mult + 'x · 最大' + maxCombo + '連続';
     document.getElementById('restartBtn').textContent = mode === 'standard' ? 'STAGE 1からもういちど' : 'もういちどあそぶ';
     document.getElementById('endOverlay').style.display = 'flex';
     if (allCleared) [523,659,784,1046,784,1046].forEach((n,i)=>tone(n,0.1,'square',0.08,i*0.08));
@@ -581,7 +723,7 @@ GAME_HTML = r"""
     btn.onclick = () => { mode = btn.dataset.mode; stage = 1; syncModeCard(); };
   });
   document.getElementById('startBtn').onclick = startFreshGame;
-  document.getElementById('nextStageBtn').onclick = advanceToDesert;
+  document.getElementById('nextStageBtn').onclick = advanceToNextStage;
   document.getElementById('restartBtn').onclick = startFreshGame;
   document.getElementById('scMenuBtn').onclick = returnToMenu;
   document.getElementById('menuBtn').onclick = returnToMenu;
@@ -597,7 +739,7 @@ GAME_HTML = r"""
     if (e.key === 'ArrowLeft' || e.key === 'a') { e.preventDefault(); moveLane(-1); }
     else if (e.key === 'ArrowRight' || e.key === 'd') { e.preventDefault(); moveLane(1); }
     else if (e.key === ' ' || e.key === 'Enter') {
-      if (state === 'STAGE_CLEAR') { e.preventDefault(); advanceToDesert(); }
+      if (state === 'STAGE_CLEAR') { e.preventDefault(); advanceToNextStage(); }
       else if (state !== 'PLAYING') { e.preventDefault(); startFreshGame(); }
     }
   });
@@ -628,7 +770,7 @@ GAME_HTML = r"""
   });
 
   function spawnWave(tier) {
-    const obs = getTheme() === 'desert' ? ['cactus', 'sandstone', 'sand_spike'] : ['brick', 'pipe', 'chestnut'];
+    const obs = mode === 'endless' ? ['brick', 'pipe', 'chestnut'] : getStageCfg(stage).obs;
     const lanes = [0, 1, 2];
     const reachable = lanes.filter(l => Math.abs(l - lastSafeLane) <= 1);
     const safe = reachable[Math.floor(Math.random() * reachable.length)];
@@ -665,6 +807,14 @@ GAME_HTML = r"""
     ctx.fillRect(x + Math.floor(w * 0.46), baseY - h + 4, 6, 4);
   }
 
+  function drawPeak(x, baseY, w, h, bodyCol, capCol, ratio) {
+    for (let row = 0; row < h; row += 4) {
+      const inset = Math.floor((row / h) * (w * 0.48));
+      ctx.fillStyle = row >= h * (1 - ratio) ? capCol : bodyCol;
+      ctx.fillRect(x + inset, baseY - row - 4, Math.max(4, w - inset * 2), 4);
+    }
+  }
+
   let last = performance.now(), hudT = 0;
   function loop(now) {
     const dt = Math.min(0.05, (now - last) / 1000);
@@ -679,18 +829,20 @@ GAME_HTML = r"""
       const tier = getDiff();
       if (tier.level > level) {
         level = tier.level;
-        banner = mode === 'endless' ? 'SPEED UP! LV.' + tier.level + ' (' + (tier.speed/BASE_SPEED).toFixed(1) + 'x)' : 'LV.' + tier.level + ' ' + tier.label + '！';
-        bannerT = 1.6; anger = 1.3;
+        banner = mode === 'endless'
+          ? 'SPEED UP! LV.' + tier.level + ' (' + (tier.speed/BASE_SPEED).toFixed(1) + 'x)'
+          : 'SPEED UP! (' + (tier.speed/BASE_SPEED).toFixed(1) + 'x) ' + tier.label;
+        bannerT = 1.5; anger = 1.2;
         [440,554,659,880].forEach((n,i)=>tone(n,0.08,'square',0.07,i*0.065));
       }
       scroll = (scroll + dt * tier.speed) % 64;
-      runT += dt * (8 + Math.min(10, level * 1.5));
+      runT += dt * (8 + Math.min(12, tier.speed / 35));
       if (invuln > 0) invuln = Math.max(0, invuln - dt);
       if (hurt > 0) hurt = Math.max(0, hurt - dt);
       if (anger > 0) anger = Math.max(0, anger - dt);
       if (bannerT > 0) bannerT = Math.max(0, bannerT - dt);
 
-      playerX += (laneX(lane) - playerX) * Math.min(1, dt * 18);
+      playerX += (laneX(lane) - playerX) * Math.min(1, dt * 19);
       tilt *= Math.pow(0.001, dt);
 
       spawnMs -= dt * 1000;
@@ -709,15 +861,19 @@ GAME_HTML = r"""
         if (Math.abs(playerX - ex) < hitX && ent.y + halfH >= hitTop && ent.y - halfH <= hitBot) {
           if (isCarrot) {
             ent.dead = true;
+            const prevMult = getStreakMult(combo);
             combo++; maxCombo = Math.max(maxCombo, combo);
             carrots++;
-            const mult = Math.min(4, 1 + Math.floor(combo / 5));
-            const pts = (ent.kind === 'gold' ? 300 : 100) * mult;
+            const mult = getStreakMult(combo);
+            const pts = Math.round((ent.kind === 'gold' ? 300 : 100) * mult);
             score += pts;
             if (score > getBest(mode)) setBest(mode, score);
             if (ent.kind === 'gold') [587,784,1046,1318].forEach((n,i)=>tone(n,0.07,'square',0.08,i*0.055));
             else { tone(659+combo*25,0.06,'square',0.07,0); tone(988+combo*25,0.1,'square',0.07,0.05); }
-            texts.push({ x: ex, y: PLAYER_Y - 32, t: '+' + pts, c: ent.kind === 'gold' ? '#FDE047' : '#FFF', l: 0.7 });
+            const label = ent.kind === 'gold'
+              ? (mult > 1 ? '+' + pts + ' GOLD x' + mult.toFixed(1) : '+' + pts + ' GOLD!')
+              : (mult > prevMult ? '+' + pts + ' x' + mult.toFixed(1) + ' UP!' : (mult > 1 ? '+' + pts + ' x' + mult.toFixed(1) : '+' + pts));
+            texts.push({ x: ex, y: PLAYER_Y - 32, t: label, c: (ent.kind === 'gold' || mult > prevMult) ? '#FDE047' : '#FFF', l: 0.7 });
           } else if (invuln <= 0) {
             ent.dead = true; lives--; combo = 0; invuln = 1.25; hurt = 0.45; anger = 1.5;
             tone(200,0.1,'sawtooth',0.09,0,100); tone(130,0.16,'square',0.09,0.06,65);
@@ -726,13 +882,21 @@ GAME_HTML = r"""
           }
         }
       }
-      entities = entities.filter(e => !e.dead && e.y < CANVAS_H + 50);
+      for (const ent of entities) {
+        if ((ent.kind === 'carrot' || ent.kind === 'gold') && !ent.dead && ent.y >= CANVAS_H + 20) {
+          if (combo > 0) {
+            combo = 0;
+            texts.push({ x: laneX(ent.lane), y: CANVAS_H - 22, t: '取り逃し x1.0', c: '#CBD5E1', l: 0.7 });
+          }
+        }
+      }
+      entities = entities.filter(e => !e.dead && e.y < CANVAS_H + 20);
       texts = texts.filter(t => { t.y -= 38 * dt; t.l -= dt; return t.l > 0; });
 
       if (mode === 'standard' && timeLeft <= 0 && state === 'PLAYING') {
         score += lives * 500;
         if (score > getBest(mode)) setBest(mode, score);
-        if (stage === 1) showStage1Clear();
+        if (stage < TOTAL_STAGES) showStageClear();
         else endGame(true);
       }
       hudT += dt;
@@ -741,53 +905,88 @@ GAME_HTML = r"""
 
     const theme = getTheme();
     ctx.imageSmoothingEnabled = false;
+    let sideC = '#248A24', roadC = '#D9A75A', centerC = '#CE9A4D', dashC = '#F8E6BE', horC = '#1B1410';
+
     if (theme === 'desert') {
       ctx.fillStyle = '#F2A65A'; ctx.fillRect(0, 0, CANVAS_W, SKY_H - 22);
       ctx.fillStyle = '#F9C97E'; ctx.fillRect(0, SKY_H - 22, CANVAS_W, 22);
       ctx.fillStyle = '#FFF3B0'; ctx.fillRect(296, 12, 24, 24);
       ctx.fillStyle = '#FDE047'; ctx.fillRect(300, 16, 16, 16);
-      drawPyramid(14, SKY_H, 108, 46);
-      drawPyramid(144, SKY_H, 76, 32);
-      drawPyramid(228, SKY_H, 116, 52);
-      ctx.fillStyle = '#FFF7E8';
-      ctx.fillRect(((60+cloudX)%(CANVAS_W+60))-50, 14, 36, 12);
-      ctx.fillRect(((210+cloudX*0.7)%(CANVAS_W+60))-50, 26, 40, 12);
-      ctx.fillStyle = '#4A2B13'; ctx.fillRect(0, SKY_H - 4, CANVAS_W, 4);
-
-      ctx.fillStyle = '#C97B36';
-      ctx.fillRect(0, SKY_H, GRASS_W, CANVAS_H - SKY_H);
-      ctx.fillRect(CANVAS_W - GRASS_W, SKY_H, GRASS_W, CANVAS_H - SKY_H);
-      ctx.fillStyle = '#EAD09A'; ctx.fillRect(GRASS_W, SKY_H, ROAD_W, CANVAS_H - SKY_H);
-      ctx.fillStyle = '#DFC182'; ctx.fillRect(GRASS_W + LANE_W, SKY_H, LANE_W, CANVAS_H - SKY_H);
+      drawPyramid(14, SKY_H, 108, 46); drawPyramid(144, SKY_H, 76, 32); drawPyramid(228, SKY_H, 116, 52);
+      sideC = '#C97B36'; roadC = '#EAD09A'; centerC = '#DFC182'; dashC = '#FFF5DC'; horC = '#4A2B13';
+    } else if (theme === 'island') {
+      ctx.fillStyle = '#38BDF8'; ctx.fillRect(0, 0, CANVAS_W, SKY_H - 26);
+      ctx.fillStyle = '#0284C7'; ctx.fillRect(0, SKY_H - 26, CANVAS_W, 26);
+      ctx.fillStyle = '#FACC15'; ctx.fillRect(236, SKY_H - 32, 76, 10);
+      ctx.fillStyle = '#78350F'; ctx.fillRect(268, SKY_H - 54, 6, 24);
+      ctx.fillStyle = '#16A34A'; ctx.fillRect(252, SKY_H - 60, 38, 8);
+      sideC = '#0284C7'; roadC = '#FDE68A'; centerC = '#FCD34D'; dashC = '#FFFFFF'; horC = '#0369A1';
+    } else if (theme === 'snow') {
+      ctx.fillStyle = '#60A5FA'; ctx.fillRect(0, 0, CANVAS_W, SKY_H - 24);
+      ctx.fillStyle = '#93C5FD'; ctx.fillRect(0, SKY_H - 24, CANVAS_W, 24);
+      drawPeak(8, SKY_H, 110, 48, '#64748B', '#F8FAFC', 0.42);
+      drawPeak(124, SKY_H, 128, 56, '#475569', '#FFFFFF', 0.45);
+      drawPeak(246, SKY_H, 108, 44, '#64748B', '#F8FAFC', 0.40);
+      sideC = '#64748B'; roadC = '#EFF6FF'; centerC = '#DBEAFE'; dashC = '#3B82F6'; horC = '#1E3A8A';
+    } else if (theme === 'jungle') {
+      ctx.fillStyle = '#0F766E'; ctx.fillRect(0, 0, CANVAS_W, SKY_H - 22);
+      ctx.fillStyle = '#115E59'; ctx.fillRect(0, SKY_H - 22, CANVAS_W, 22);
+      ctx.fillStyle = '#064E3B'; ctx.fillRect(16, SKY_H - 44, 64, 44); ctx.fillRect(28, SKY_H - 56, 40, 12);
+      ctx.fillStyle = '#15803D'; ctx.fillRect(120, SKY_H - 36, 92, 36); ctx.fillRect(240, SKY_H - 48, 104, 48);
+      sideC = '#14532D'; roadC = '#7C5A3B'; centerC = '#694A2E'; dashC = '#BEF264'; horC = '#052E16';
+    } else if (theme === 'mountain') {
+      ctx.fillStyle = '#9A3412'; ctx.fillRect(0, 0, CANVAS_W, SKY_H - 24);
+      ctx.fillStyle = '#EA580C'; ctx.fillRect(0, SKY_H - 24, CANVAS_W, 24);
+      drawPeak(0, SKY_H, 130, 52, '#44403C', '#78716C', 0.30);
+      drawPeak(115, SKY_H, 136, 62, '#292524', '#57534E', 0.32);
+      drawPeak(230, SKY_H, 130, 48, '#44403C', '#78716C', 0.28);
+      sideC = '#44403C'; roadC = '#A8A29E'; centerC = '#8E8883'; dashC = '#FDE68A'; horC = '#1C1917';
+    } else if (theme === 'cloud') {
+      ctx.fillStyle = '#2563EB'; ctx.fillRect(0, 0, CANVAS_W, SKY_H - 20);
+      ctx.fillStyle = '#60A5FA'; ctx.fillRect(0, SKY_H - 20, CANVAS_W, 20);
+      ['#EF4444','#F97316','#FACC15','#22C55E','#38BDF8'].forEach((c, i) => {
+        ctx.fillStyle = c; ctx.fillRect(190 + i * 4, 14 + i * 4, 90 - i * 8, 4);
+      });
+      ctx.fillStyle = '#FFFFFF';
+      for (let cx = 0; cx < CANVAS_W; cx += 48) { ctx.fillRect(cx + 4, SKY_H - 16, 40, 16); ctx.fillRect(cx + 12, SKY_H - 22, 24, 6); }
+      sideC = '#93C5FD'; roadC = '#FFFFFF'; centerC = '#E0F2FE'; dashC = '#38BDF8'; horC = '#1D4ED8';
+    } else if (theme === 'castle') {
+      ctx.fillStyle = '#1C1917'; ctx.fillRect(0, 0, CANVAS_W, SKY_H - 18);
+      ctx.fillStyle = '#DC2626'; ctx.fillRect(0, SKY_H - 18, CANVAS_W, 18);
+      ctx.fillStyle = '#F97316'; ctx.fillRect(0, SKY_H - 10, CANVAS_W, 10);
+      ctx.fillStyle = '#292524';
+      for (let bx = 12; bx < CANVAS_W; bx += 64) {
+        ctx.fillRect(bx, SKY_H - 54, 40, 36);
+        ctx.fillRect(bx, SKY_H - 62, 10, 8); ctx.fillRect(bx+15, SKY_H - 62, 10, 8); ctx.fillRect(bx+30, SKY_H - 62, 10, 8);
+      }
+      sideC = '#991B1B'; roadC = '#57534E'; centerC = '#44403C'; dashC = '#FBBF24'; horC = '#0C0A09';
     } else {
       ctx.fillStyle = '#5C94FC'; ctx.fillRect(0, 0, CANVAS_W, SKY_H);
       ctx.fillStyle = '#198E19'; ctx.fillRect(28, SKY_H - 22, 64, 22); ctx.fillRect(240, SKY_H - 28, 76, 28);
       ctx.fillStyle = '#FFF';
       ctx.fillRect(((60+cloudX)%(CANVAS_W+60))-50, 20, 36, 12);
       ctx.fillRect(((230+cloudX*0.7)%(CANVAS_W+60))-50, 34, 40, 12);
-      ctx.fillStyle = '#1B1410'; ctx.fillRect(0, SKY_H - 4, CANVAS_W, 4);
-
-      ctx.fillStyle = '#248A24';
-      ctx.fillRect(0, SKY_H, GRASS_W, CANVAS_H - SKY_H);
-      ctx.fillRect(CANVAS_W - GRASS_W, SKY_H, GRASS_W, CANVAS_H - SKY_H);
-      ctx.fillStyle = '#D9A75A'; ctx.fillRect(GRASS_W, SKY_H, ROAD_W, CANVAS_H - SKY_H);
-      ctx.fillStyle = '#CE9A4D'; ctx.fillRect(GRASS_W + LANE_W, SKY_H, LANE_W, CANVAS_H - SKY_H);
     }
 
+    ctx.fillStyle = horC; ctx.fillRect(0, SKY_H - 4, CANVAS_W, 4);
+    ctx.fillStyle = sideC; ctx.fillRect(0, SKY_H, GRASS_W, CANVAS_H - SKY_H); ctx.fillRect(CANVAS_W - GRASS_W, SKY_H, GRASS_W, CANVAS_H - SKY_H);
+    ctx.fillStyle = roadC; ctx.fillRect(GRASS_W, SKY_H, ROAD_W, CANVAS_H - SKY_H);
+    ctx.fillStyle = centerC; ctx.fillRect(GRASS_W + LANE_W, SKY_H, LANE_W, CANVAS_H - SKY_H);
+
     if (state === 'PLAYING') {
-      ctx.fillStyle = theme === 'desert' ? 'rgba(255,255,255,0.22)' : 'rgba(255,255,255,0.14)';
+      ctx.fillStyle = theme === 'castle' ? 'rgba(253,224,71,0.14)' : ((theme === 'snow' || theme === 'cloud') ? 'rgba(59,130,246,0.15)' : 'rgba(255,255,255,0.18)');
       ctx.fillRect(GRASS_W + lane * LANE_W + 4, PLAYER_Y - 34, LANE_W - 8, 68);
     }
 
     const off = Math.floor(scroll);
     for (let y = SKY_H - 64 + off; y < CANVAS_H + 32; y += 64) {
       if (y >= SKY_H) {
-        ctx.fillStyle = theme === 'desert' ? '#FFF5DC' : '#F8E6BE';
+        ctx.fillStyle = dashC;
         ctx.fillRect(GRASS_W + LANE_W - 2, y, 4, 28);
         ctx.fillRect(GRASS_W + LANE_W * 2 - 2, y, 4, 28);
-        ctx.fillStyle = theme === 'desert' ? '#E69F58' : '#4CE04C';
-        ctx.fillRect(12, y + 10, 12, 6);
-        ctx.fillRect(CANVAS_W - 24, y + 24, 12, 6);
+        ctx.fillStyle = theme === 'castle' ? '#F97316' : (theme === 'snow' || theme === 'cloud' ? '#FFF' : (theme === 'desert' ? '#E69F58' : '#4CE04C'));
+        ctx.fillRect(12, y + 10, 14, 6);
+        ctx.fillRect(CANVAS_W - 26, y + 26, 14, 6);
       }
     }
 
@@ -826,9 +1025,9 @@ GAME_HTML = r"""
 
     if (bannerT > 0 && state === 'PLAYING') {
       ctx.fillStyle = 'rgba(18,22,32,0.85)';
-      ctx.fillRect(30, 120, CANVAS_W - 60, 42);
+      ctx.fillRect(24, 120, CANVAS_W - 48, 42);
       ctx.strokeStyle = '#FACC15'; ctx.lineWidth = 3;
-      ctx.strokeRect(30, 120, CANVAS_W - 60, 42);
+      ctx.strokeRect(24, 120, CANVAS_W - 48, 42);
       ctx.font = '15px "DotGothic16", monospace';
       ctx.fillStyle = '#FACC15';
       ctx.fillText(banner, CANVAS_W / 2, 147);
@@ -845,4 +1044,3 @@ GAME_HTML = r"""
 """
 
 components.html(GAME_HTML, height=740, scrolling=False)
-
