@@ -1,3 +1,4 @@
+
 import streamlit as st
 import streamlit.components.v1 as components
 
@@ -236,7 +237,9 @@ GAME_HTML = r"""
   ];
 
   const PAL = {
-    K:'#1A120E', G:'#F59E0B', L:'#FDE073', D:'#C2670A', W:'#FFFFFF', R:'#E63946',
+    K:'#1A120E', k:'#4A2810', e:'#1E1410', g:'#F8B43C', l:'#FFE8A3', d:'#D9821E',
+    w:'#FFFFFF', p:'#FF8FA3', r:'#EF4444', y:'#FDE047',
+    G:'#F59E0B', L:'#FDE073', D:'#C2670A', W:'#FFFFFF', R:'#E63946',
     P:'#FCA5A5', O:'#FF6B1A', Y:'#FFA834', C:'#B44309', V:'#22C55E', F:'#15803D',
     B:'#C84C0C', H:'#FC9838', N:'#00A800', S:'#80D010', E:'#005800', T:'#9E4718',
     U:'#D97724', Z:'#FDE68A', A:'#F59E0B', X:'#B45309'
@@ -262,25 +265,28 @@ GAME_HTML = r"""
 
   const SPRITES = {
     run1: mkSprite([
-      '........KKKK........','......KKGGGGKK......','.....KGGGGGGGGK.....','....KGGKGGGGKGGK....',
-      '...KDDGKKGGKKGDDK...','..KDDDGWKGKGWKDDDK..','..KDDGGKKGGKKGGDDK..','..KDDGLLLLLLLLGDDK..',
-      '..KDDGLLKKKKLLGDDK..','...KDGLLLKKLLLGK....','....KKLLLLLLLLK.....','.....KRRRRRRRRK.....',
-      '....KKGGGGGGGGKK....','...KGGLLLLLLLLGGK...','...KGGLLLLLLLLGGK...','..KKGGGGGGGGGGGGKK..',
-      '..KLLKGGKKKKGGKDDK..','..KKK.KDK..KDK.KK...','......KKK..KKK......','....................'
+      '........................','.......kkkkkkkkkk.......','.....kkggggggggggkk.....','....kggggggggggggggk....',
+      '...kddggggggggggggddk...','..kdddggkggggggkggdddk..','..kdddgggkggggkgggdddk..','.kddddggweggggweggddddk.',
+      '.kddddggeegllgeeggddddk.','.kdddggpplleellppggdddk.','..kddkgglllkklllggkddk..','...kkgggllkllkllgggkk...',
+      '.....krrrrryyrrrrrk.....','.....kggggllllggggk.....','....kggggllllllggggk....','....kggggllllllggggkggk.',
+      '....kggggllllllggggkllk.','....kgggggllllgggggkkk..','....klllgggggggglllk....','....klllkggkkggklllk....',
+      '.....kkk.kdkkdk.kkk.....','.........kk..kk.........','........................','........................'
     ], 3),
     run2: mkSprite([
-      '.......KKKK.........','......KGGGGKK.......','.....KGGGGGGGGK.....','...KKGGKGGGGKGGKK...',
-      '..KDDGGKKGGKKGGDDK..','..KDDGGWKGKGWKGGDK..','..KDDGGKKGGKKGGDDK..','...KDGLLLLLLLLGDK...',
-      '...KDGLLKKKKLLGDK...','....KGLLLKKLLLGK....','....KKLLLLLLLLK.....','.....KRRRRRRRRK.....',
-      '....KKGGGGGGGGKK....','...KGGLLLLLLLLGGK...','...KGGGGLLLLGGGGK...','...KGGGGGGGGGGGGK...',
-      '....KLLKGGGGKLLK....','....KKK.KKKK.KKK....','........KKKK........','....................'
+      '.......kkkkkkkkkk.......','.....kkggggggggggkk.....','....kggggggggggggggk....','..kkddggggggggggggddkk..',
+      '.kddddggkggggggkggddddk.','kddddggggkggggkggggddddk','kddddgggweggggwegggddddk','.kdddgggeegllgeegggdddk.',
+      '.kdddggpplleellppggdddk.','..kddkgglllkklllggkddk..','...kkgggllkllkllgggkk...','.....krrrrryyrrrrrk.....',
+      '.....kggggllllggggk.....','....kggggllllllggggk....','.kggkggggllllllggggk....','.kllkggggllllllggggk....',
+      '..kkkgggggllllgggggk....','....kggggggggggggggk....','.....klllkggggklllk.....','......kkk.kkkk.kkk......',
+      '........................','........................','........................','........................'
     ], 3),
     hurt: mkSprite([
-      '........KKKK........','......KKGGGGKK......','.....KGGGGGGGGK.....','...KKGGKGGGGKGGKK...',
-      '..KDDGGKGGGGKGGDDK..','..KDDGK.KGGK.KGDDK..','..KDDGGKGGGGKGGDDK..','...KDGLLLLLLLLGDK...',
-      '...KDGLLLKKLLLGDK...','....KGLLKPPKLLGK....','....KKLLLLLLLLK.....','.....KRRRRRRRRK.....',
-      '....KKGGGGGGGGKK....','...KGGGGGGGGGGGGK...','..KLLGGGGGGGGGGLLK..','..KK.KGGGGGGGGK.KK..',
-      '.....KDK....KDK.....','.....KKK....KKK.....','....................','....................'
+      '........................','.......kkkkkkkkkk.......','.....kkggggggggggkk.....','....kggggggggggggggk....',
+      '...kddggggggggggggddk...','..kdddggkggggggkggdddk..','.kddddggkggggggkggddddk.','.kddddgggkgllgkgggddddk.',
+      '.kddddggkggllggkggddddk.','.kdddggpplleellppggdddk.','..kddkgglllpplllggkddk..','...kkgggllllllllgggkk...',
+      '.....krrrrryyrrrrrk.....','.....kggggllllggggk.....','....kggggllllllggggk....','...kllggggggggggggllk...',
+      '...kkkggggggggggggkkk...','.....kggggggggggggk.....','......kddk....kddk......','......kkkk....kkkk......',
+      '........................','........................','........................','........................'
     ], 3),
     anger: mkSprite([
       '.RR..RR.','RWR..RWR','.RR..RR.','........','.RR..RR.','RWR..RWR','.RR..RR.','........'
@@ -585,9 +591,9 @@ GAME_HTML = r"""
       ctx.save();
       ctx.translate(Math.round(playerX), Math.round(PLAYER_Y + (f ? 0 : -3)));
       ctx.rotate(tilt);
-      ctx.drawImage(sp, -30, -30);
+      ctx.drawImage(sp, -Math.round(sp.width / 2), -Math.round(sp.height / 2));
       if ((anger > 0 || Math.floor(runT * 0.4) % 4 === 0) && hurt <= 0) {
-        ctx.drawImage(SPRITES.anger, 16, -34);
+        ctx.drawImage(SPRITES.anger, 22, -38);
       }
       ctx.restore();
     }
