@@ -1,4 +1,3 @@
-
 import streamlit as st
 import streamlit.components.v1 as components
 
@@ -106,13 +105,13 @@ GAME_HTML = r"""
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 20px;
-    background: rgba(14, 19, 29, 0.8);
+    padding: 18px;
+    background: rgba(14, 19, 29, 0.78);
     border-radius: 12px;
   }
   .card {
     width: 100%;
-    max-width: 295px;
+    max-width: 310px;
     background: #161B26;
     border: 2px solid #F59E0B;
     border-radius: 12px;
@@ -120,10 +119,36 @@ GAME_HTML = r"""
     text-align: center;
   }
   .card h2 { margin: 6px 0 8px; font-size: 21px; line-height: 1.35; color: #FFFFFF; }
-  .card p { margin: 0; font-size: 12px; color: #CBD5E1; line-height: 1.6; }
+  .card p { margin: 10px 0 0; font-size: 12px; color: #CBD5E1; line-height: 1.6; }
   .kicker { font-size: 12px; color: #FDE073; }
+  .mode-tabs {
+    margin-top: 12px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 4px;
+    padding: 4px;
+    background: #0F131C;
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 8px;
+  }
+  .mode-tab {
+    padding: 7px 4px;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: #CBD5E1;
+    font-family: 'DotGothic16', sans-serif;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .mode-tab.active {
+    background: #FF6B1A;
+    color: #FFFFFF;
+  }
+  .mode-meta { margin-top: 10px; font-size: 12px; color: #F8FAFC; }
+  .mode-sub { margin-top: 3px; font-size: 11px; color: #94A3B8; }
   .start-btn {
-    margin-top: 16px;
+    margin-top: 14px;
     width: 100%;
     padding: 12px 16px;
     border: none;
@@ -135,6 +160,18 @@ GAME_HTML = r"""
     cursor: pointer;
   }
   .start-btn:hover { background: #FF7F38; }
+  .secondary-btn {
+    margin-top: 8px;
+    width: 100%;
+    padding: 10px 14px;
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 8px;
+    background: #1E2536;
+    color: #E2E8F0;
+    font-family: 'DotGothic16', sans-serif;
+    font-size: 13px;
+    cursor: pointer;
+  }
   .stats-box {
     margin-top: 12px;
     padding: 10px 0;
@@ -178,7 +215,7 @@ GAME_HTML = r"""
       <span class="hud-sub" id="bestVal">BEST 0</span>
     </div>
     <div class="hud-col" style="text-align:center;">
-      <span class="hud-label">のこり時間</span>
+      <span class="hud-label" id="midLabel">のこり時間</span>
       <span class="hud-val" id="timeVal">60s</span>
       <span class="hud-sub" id="levelVal">LV.1 おさんぽ</span>
     </div>
@@ -194,9 +231,16 @@ GAME_HTML = r"""
 
     <div id="titleOverlay" class="overlay">
       <div class="card">
-        <div class="kicker">1分間 3レーン・ランゲーム</div>
+        <div class="kicker">3レーン・ランゲーム</div>
         <h2>怒りのレトリーバー！<br/>にんじんダッシュ</h2>
-        <p>指で左右にスライド（または矢印キー）して障害物をよけ、60秒間にんじんを集めよう！</p>
+        <div class="mode-tabs">
+          <button class="mode-tab active" data-mode="meadow_60">草原 60秒</button>
+          <button class="mode-tab" data-mode="desert_60">砂漠 60秒</button>
+          <button class="mode-tab" data-mode="endless">エンドレス</button>
+        </div>
+        <div class="mode-meta" id="modeTitle">ステージ1：草原</div>
+        <div class="mode-sub" id="modeSub">60秒 · 段階レベルアップ · BEST 0</div>
+        <p id="modeDesc">指で左右にスライド（または矢印キー）して障害物をよけ、60秒間にんじんを集めよう！</p>
         <button id="startBtn" class="start-btn">ゲームスタート</button>
       </div>
     </div>
@@ -208,9 +252,10 @@ GAME_HTML = r"""
         <div class="stats-box">
           <div class="stat-row"><span>スコア</span><strong id="endScore" style="color:#FDE073;">0</strong></div>
           <div class="stat-row"><span>ハイスコア</span><strong id="endBest">0</strong></div>
-          <div class="stat-row"><span>にんじん / 最大コンボ</span><span id="endDetail">0本 · 0</span></div>
+          <div class="stat-row"><span>結果</span><span id="endDetail">0本 · 1.0x</span></div>
         </div>
         <button id="restartBtn" class="start-btn">もういちどあそぶ</button>
+        <button id="menuBtn" class="secondary-btn">モード選択へもどる</button>
       </div>
     </div>
   </div>
@@ -225,8 +270,33 @@ GAME_HTML = r"""
 (() => {
   const CANVAS_W = 360, CANVAS_H = 560, SKY_H = 76, GRASS_W = 48;
   const ROAD_W = CANVAS_W - GRASS_W * 2, LANE_W = ROAD_W / 3, PLAYER_Y = 456;
-  const DURATION = 60, MAX_LIVES = 3;
-  const BEST_KEY = 'golden_carrot_dash_best_st';
+  const DURATION = 60, MAX_LIVES = 3, BASE_SPEED = 235;
+  const BEST_KEYS = {
+    meadow_60: 'golden_carrot_dash_best_st',
+    desert_60: 'golden_carrot_dash_best_st_desert',
+    endless: 'golden_carrot_dash_best_st_endless'
+  };
+
+  const MODE_INFO = {
+    meadow_60: {
+      title: 'ステージ1：草原',
+      sub: '60秒 · 段階レベルアップ',
+      desc: '指で左右にスライド（または矢印キー）して障害物をよけ、60秒間にんじんを集めよう！',
+      theme: 'meadow'
+    },
+    desert_60: {
+      title: 'ステージ2：砂漠',
+      sub: '60秒 · ピラミッド＆サボテン',
+      desc: 'サボテンや砂岩ブロックをよけながら、ピラミッドがそびえる砂漠を60秒走り抜けよう！',
+      theme: 'desert'
+    },
+    endless: {
+      title: 'エンドレスモード',
+      sub: '草原 · にんじんで無限加速',
+      desc: 'にんじんを取るほどスピードが無限に上昇！ライフが尽きるまで走り続けよう。',
+      theme: 'meadow'
+    }
+  };
 
   const TIERS = [
     { level: 1, label: 'おさんぽ', speed: 235, interval: 820, dbl: 0.08, carrot: 0.62 },
@@ -237,12 +307,13 @@ GAME_HTML = r"""
   ];
 
   const PAL = {
-    K:'#1A120E', k:'#4A2810', e:'#1E1410', g:'#F8B43C', l:'#FFE8A3', d:'#D9821E',
-    w:'#FFFFFF', p:'#FF8FA3', r:'#EF4444', y:'#FDE047',
+    K:'#1A120E', k:'#6B4E35', e:'#1E1614', g:'#DFBE97', l:'#F0DAC0', d:'#BA9268',
+    w:'#FFFFFF', p:'#E8998D', r:'#EF4444', y:'#FDE047',
     G:'#F59E0B', L:'#FDE073', D:'#C2670A', W:'#FFFFFF', R:'#E63946',
-    P:'#FCA5A5', O:'#FF6B1A', Y:'#FFA834', C:'#B44309', V:'#22C55E', F:'#15803D',
+    P:'#FCA5A5', O:'#FF6B1A', Y:'#FFA834', C:'#B44309', V:'#22C55E', F:'#15803D', I:'#0D5229',
     B:'#C84C0C', H:'#FC9838', N:'#00A800', S:'#80D010', E:'#005800', T:'#9E4718',
-    U:'#D97724', Z:'#FDE68A', A:'#F59E0B', X:'#B45309'
+    U:'#D97724', Z:'#FDE68A', A:'#F59E0B', X:'#B45309',
+    j:'#F3B36C', m:'#D97736', n:'#8C4216', s:'#C26D3A', t:'#E69F66'
   };
 
   function mkSprite(rows, sc) {
@@ -265,27 +336,27 @@ GAME_HTML = r"""
 
   const SPRITES = {
     run1: mkSprite([
-      '........................','.......kkkkkkkkkk.......','.....kkggggggggggkk.....','....kggggggggggggggk....',
-      '...kddggggggggggggddk...','..kdddggkggggggkggdddk..','..kdddgggkggggkgggdddk..','.kddddggweggggweggddddk.',
-      '.kddddggeegllgeeggddddk.','.kdddggpplleellppggdddk.','..kddkgglllkklllggkddk..','...kkgggllkllkllgggkk...',
-      '.....krrrrryyrrrrrk.....','.....kggggllllggggk.....','....kggggllllllggggk....','....kggggllllllggggkggk.',
-      '....kggggllllllggggkllk.','....kgggggllllgggggkkk..','....klllgggggggglllk....','....klllkggkkggklllk....',
-      '.....kkk.kdkkdk.kkk.....','.........kk..kk.........','........................','........................'
+      '........................','.......kkkkkkkkkk.......','.....kkllllllllllkk.....','....kllggggggggggllk....',
+      '...kggggggggggggggggk...','..kddggggkggggggkggddk..','.kddgggwekkggggkkewggddk','.kdddggeeelllllleeeedddk',
+      '.kddgggllleeeelllgggdddk','.kddgggllleeeelllgggdddk','..kddkgglllkklllggkddk..','...kkgggllllllllgggkk...',
+      '....kkggggllllggggkk....','....kggggllllllggggk....','....kggggllllllggggkggk.','....kggggllllllggggkllk.',
+      '....kgggggllllgggggkkk..','....kllggggddggggllk....','....kllkgggddgggkllk....','....keek.kdkkdk.keek....',
+      '.....kk...kkkk...kk.....','........................','........................','........................'
     ], 3),
     run2: mkSprite([
-      '.......kkkkkkkkkk.......','.....kkggggggggggkk.....','....kggggggggggggggk....','..kkddggggggggggggddkk..',
-      '.kddddggkggggggkggddddk.','kddddggggkggggkggggddddk','kddddgggweggggwegggddddk','.kdddgggeegllgeegggdddk.',
-      '.kdddggpplleellppggdddk.','..kddkgglllkklllggkddk..','...kkgggllkllkllgggkk...','.....krrrrryyrrrrrk.....',
-      '.....kggggllllggggk.....','....kggggllllllggggk....','.kggkggggllllllggggk....','.kllkggggllllllggggk....',
-      '..kkkgggggllllgggggk....','....kggggggggggggggk....','.....klllkggggklllk.....','......kkk.kkkk.kkk......',
+      '.......kkkkkkkkkk.......','.....kkllllllllllkk.....','....kllggggggggggllk....','..kkggggggggggggggggkk..',
+      '.kddggggkggggggkggggddk.','kdddgggwekkggggkkewggddk','kddddggeeelllllleeeedddk','.kddgggllleeeelllgggdddk',
+      '.kddgggllleeeelllgggdddk','..kddkgglllkklllggkddk..','...kkgggllllllllgggkk...','....kkggggllllggggkk....',
+      '....kggggllllllggggk....','.kggkggggllllllggggk....','.kllkggggllllllggggk....','..kkkgggggllllgggggk....',
+      '....kggggggddggggggk....','.....kllkggddggkllk.....','.....keek.kkkk.keek.....','......kk........kk......',
       '........................','........................','........................','........................'
     ], 3),
     hurt: mkSprite([
-      '........................','.......kkkkkkkkkk.......','.....kkggggggggggkk.....','....kggggggggggggggk....',
-      '...kddggggggggggggddk...','..kdddggkggggggkggdddk..','.kddddggkggggggkggddddk.','.kddddgggkgllgkgggddddk.',
-      '.kddddggkggllggkggddddk.','.kdddggpplleellppggdddk.','..kddkgglllpplllggkddk..','...kkgggllllllllgggkk...',
-      '.....krrrrryyrrrrrk.....','.....kggggllllggggk.....','....kggggllllllggggk....','...kllggggggggggggllk...',
-      '...kkkggggggggggggkkk...','.....kggggggggggggk.....','......kddk....kddk......','......kkkk....kkkk......',
+      '........................','.......kkkkkkkkkk.......','.....kkllllllllllkk.....','....kllggggggggggllk....',
+      '...kggggggggggggggggk...','..kddggggkggggggkggddk..','.kddggggkggggggggkgggddk','.kdddggggkllllllkggggddk',
+      '.kddgggllleeeelllgggdddk','.kddgggllleeeelllgggdddk','..kddkgglllpplllggkddk..','...kkgggllllllllgggkk...',
+      '....kkggggllllggggkk....','....kggggllllllggggk....','...kllggggggggggggllk...','...keekggggggggggkeek...',
+      '....kk.kggggggggk.kk....','.......kdk....kdk.......','.......kee....eek.......','........kk....kk........',
       '........................','........................','........................','........................'
     ], 3),
     anger: mkSprite([
@@ -320,6 +391,24 @@ GAME_HTML = r"""
       '.KTUUUTTTTTTTTK.','KTUTKKTTTTKKTUTK','KTTKWKKTTKKWKTTK','KTTTWWKTTKWWTTTK',
       'KTTTTTKTTKTTTTTK','KTTTTTTTTTTTTTTK','.KTTTLLLLLLTTTK.','..KKLLLLLLLLKK..',
       '...KKKKKKKKKK...','..KDDK....KDDK..','..KKKK....KKKK..','................'
+    ], 3),
+    cactus: mkSprite([
+      '......KKKK......','.....KVFFIK.....','.KKK.KVFFWK.KKK.','KVFIKKVFFIKKVFIK',
+      'KVFIKKWFFIKKVFIK','KVFIKKVFFIKKVFIK','KVFKKKKFFIKKVFIK','.KKVFFFVFFIKKKK.',
+      '...KKKKVFFIK....','.....KVFFIK.....','.....KWFFIK.....','.....KVFFIK.....',
+      '.....KVFFWK.....','.....KVFFIK.....','....KKVFFIKK....','...KKKKKKKKKK...'
+    ], 3),
+    sandstone: mkSprite([
+      'KKKKKKKKKKKKKKKK','KjjjjjjjKjjjjjjK','KjmmmmmmKjmmnmmK','KjmjmmmmKjmnmmmK',
+      'KKKKKKKKKKKKKKKK','KjjjKjjjjjjjKjjK','KmmmKmmmnmmmKmmK','KmmnKmmmmmmmKmmK',
+      'KKKKKKKKKKKKKKKK','KjjjjjjjKjjjjjjK','KjmmmmmmKjmmmmnK','KjmmnmmmKjmmmmmK',
+      'KKKKKKKKKKKKKKKK','KjjjKjjjjjjjKjjK','KmmmKmmmmmmmKmmK','KKKKKKKKKKKKKKKK'
+    ], 3),
+    sand_spike: mkSprite([
+      '.......KK.......','......KWWK......','....KKttttKK....','..KKttssssssKK..',
+      '.KWtssssssssstWK','KKtKKssssssKKtKK','KtKWKKssssKKWKtK','KssWWKssssKWWssK',
+      'KssssssssssssssK','KsssnnnnnnnnsssK','.KssnnKKKKnnssK.','..KKnnnnnnnnKK..',
+      '...KKKKKKKKKK...','..KnnK....KnnK..','..KKKK....KKKK..','................'
     ], 3)
   };
 
@@ -349,19 +438,53 @@ GAME_HTML = r"""
   const ctx = canvas.getContext('2d');
   const laneX = (l) => GRASS_W + LANE_W * l + LANE_W / 2;
 
-  let bestScore = Number(localStorage.getItem(BEST_KEY) || '0');
+  let mode = 'meadow_60';
+  function getBest(m) { return Number(localStorage.getItem(BEST_KEYS[m]) || '0'); }
+  function setBest(m, val) { localStorage.setItem(BEST_KEYS[m], String(val)); }
+
   let state = 'TITLE';
   let lane = 1, playerX = laneX(1), tilt = 0;
   let invuln = 0, hurt = 0, anger = 1, runT = 0, scroll = 0, cloudX = 0;
   let elapsed = 0, timeLeft = DURATION, score = 0, carrots = 0, combo = 0, maxCombo = 0, lives = MAX_LIVES, level = 1;
-  let spawnMs = 250, entities = [], particles = [], texts = [], banner = '', bannerT = 0;
+  let spawnMs = 250, lastSafeLane = 1, entities = [], texts = [], banner = '', bannerT = 0;
+
+  function getDiff() {
+    if (mode === 'endless') {
+      const speed = BASE_SPEED + carrots * 11;
+      const interval = Math.max(220, Math.round(800 - carrots * 10));
+      const dbl = Math.min(0.62, 0.1 + carrots * 0.012);
+      const lv = 1 + Math.floor(carrots / 8);
+      const labels = ['おさんぽ', 'かけあし', '本気ダッシュ', 'ぷんぷん猛走', '爆速モード', '限界突破'];
+      return { level: lv, label: labels[Math.min(labels.length - 1, lv - 1)], speed, interval, dbl, carrot: 0.66 };
+    }
+    return TIERS[Math.min(TIERS.length - 1, Math.floor(elapsed / 12))];
+  }
+
+  function syncModeCard() {
+    const info = MODE_INFO[mode];
+    document.querySelectorAll('.mode-tab').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.mode === mode);
+    });
+    document.getElementById('modeTitle').textContent = info.title;
+    document.getElementById('modeSub').textContent = info.sub + ' · BEST ' + getBest(mode).toLocaleString();
+    document.getElementById('modeDesc').textContent = info.desc;
+    syncHud();
+  }
 
   function syncHud() {
-    const tier = TIERS[Math.min(TIERS.length - 1, Math.floor(elapsed / 12))];
+    const tier = getDiff();
+    const mult = (tier.speed / BASE_SPEED).toFixed(1);
     document.getElementById('scoreVal').textContent = score.toLocaleString();
-    document.getElementById('bestVal').textContent = 'BEST ' + bestScore.toLocaleString();
-    document.getElementById('timeVal').textContent = Math.ceil(timeLeft) + 's';
-    document.getElementById('levelVal').textContent = 'LV.' + tier.level + ' ' + tier.label;
+    document.getElementById('bestVal').textContent = 'BEST ' + getBest(mode).toLocaleString();
+    if (mode === 'endless') {
+      document.getElementById('midLabel').textContent = 'スピード';
+      document.getElementById('timeVal').textContent = mult + 'x';
+      document.getElementById('levelVal').textContent = 'LV.' + tier.level + ' · ' + Math.floor(elapsed) + 's';
+    } else {
+      document.getElementById('midLabel').textContent = 'のこり時間';
+      document.getElementById('timeVal').textContent = Math.ceil(timeLeft) + 's';
+      document.getElementById('levelVal').textContent = 'LV.' + tier.level + ' ' + tier.label;
+    }
     document.getElementById('livesVal').textContent = '♥'.repeat(Math.max(0, lives)) + '♡'.repeat(Math.max(0, MAX_LIVES - lives));
     document.getElementById('carrotVal').textContent = carrots + '本';
   }
@@ -371,8 +494,9 @@ GAME_HTML = r"""
     lane = 1; playerX = laneX(1); tilt = 0;
     invuln = 0; hurt = 0; anger = 1.1; elapsed = 0; timeLeft = DURATION;
     score = 0; carrots = 0; combo = 0; maxCombo = 0; lives = MAX_LIVES; level = 1;
-    spawnMs = 250; entities = []; particles = []; texts = [];
-    banner = 'ダッシュ！にんじんを集めろ！'; bannerT = 1.4;
+    spawnMs = 250; lastSafeLane = 1; entities = []; texts = [];
+    banner = mode === 'endless' ? '無限加速！にんじんを集めろ！' : (mode === 'desert_60' ? '砂漠ステージ！ダッシュ！' : 'ダッシュ！にんじんを集めろ！');
+    bannerT = 1.4;
     document.getElementById('titleOverlay').style.display = 'none';
     document.getElementById('endOverlay').style.display = 'none';
     document.getElementById('touchControls').style.display = 'grid';
@@ -382,12 +506,14 @@ GAME_HTML = r"""
 
   function endGame(cleared) {
     state = cleared ? 'CLEAR' : 'OVER';
+    const tier = getDiff();
+    const mult = (tier.speed / BASE_SPEED).toFixed(1);
     document.getElementById('touchControls').style.display = 'none';
-    document.getElementById('endKicker').textContent = cleared ? '60秒完走！お疲れさま！' : '障害物にぶつかった！';
+    document.getElementById('endKicker').textContent = cleared ? MODE_INFO[mode].title + ' 60秒完走！' : MODE_INFO[mode].title + ' · 障害物にぶつかった！';
     document.getElementById('endTitle').textContent = cleared ? 'ステージクリア！' : 'ゲームオーバー';
     document.getElementById('endScore').textContent = score.toLocaleString();
-    document.getElementById('endBest').textContent = bestScore.toLocaleString();
-    document.getElementById('endDetail').textContent = carrots + '本 · 最大' + maxCombo + 'コンボ';
+    document.getElementById('endBest').textContent = getBest(mode).toLocaleString();
+    document.getElementById('endDetail').textContent = carrots + '本 · 速度 ' + mult + 'x · 最大' + maxCombo + 'コンボ';
     document.getElementById('endOverlay').style.display = 'flex';
     if (cleared) [523,659,784,1046,784,1046].forEach((n,i)=>tone(n,0.1,'square',0.08,i*0.08));
     else [392,349,311,261].forEach((n,i)=>tone(n,0.14,'sawtooth',0.08,i*0.11));
@@ -411,8 +537,18 @@ GAME_HTML = r"""
     tone(280, 0.07, 'triangle', 0.06, 0, 420);
   }
 
+  document.querySelectorAll('.mode-tab').forEach(btn => {
+    btn.onclick = () => { mode = btn.dataset.mode; syncModeCard(); };
+  });
   document.getElementById('startBtn').onclick = startGame;
   document.getElementById('restartBtn').onclick = startGame;
+  document.getElementById('menuBtn').onclick = () => {
+    state = 'TITLE';
+    score = 0; carrots = 0; combo = 0; lives = MAX_LIVES; elapsed = 0; timeLeft = DURATION;
+    document.getElementById('endOverlay').style.display = 'none';
+    document.getElementById('titleOverlay').style.display = 'flex';
+    syncModeCard();
+  };
   document.getElementById('leftBtn').onclick = () => moveLane(-1);
   document.getElementById('centerBtn').onclick = () => jumpLane(1);
   document.getElementById('rightBtn').onclick = () => moveLane(1);
@@ -453,13 +589,15 @@ GAME_HTML = r"""
   });
 
   function spawnWave(tier) {
-    const obs = ['brick', 'pipe', 'chestnut'];
+    const obs = MODE_INFO[mode].theme === 'desert' ? ['cactus', 'sandstone', 'sand_spike'] : ['brick', 'pipe', 'chestnut'];
     const lanes = [0, 1, 2];
-    const safe = lanes[Math.floor(Math.random() * 3)];
+    const reachable = lanes.filter(l => Math.abs(l - lastSafeLane) <= 1);
+    const safe = reachable[Math.floor(Math.random() * reachable.length)];
+    lastSafeLane = safe;
     const blocked = lanes.filter(l => l !== safe);
     if (Math.random() < tier.dbl) {
       blocked.forEach(bl => entities.push({ kind: obs[Math.floor(Math.random()*3)], lane: bl, y: SKY_H - 36, bob: Math.random()*6 }));
-      if (Math.random() < 0.78) entities.push({ kind: Math.random() < 0.14 ? 'gold' : 'carrot', lane: safe, y: SKY_H - 36, bob: Math.random()*6 });
+      if (Math.random() < (mode === 'endless' ? 0.85 : 0.78)) entities.push({ kind: Math.random() < 0.14 ? 'gold' : 'carrot', lane: safe, y: SKY_H - 64, bob: Math.random()*6 });
     } else {
       let obLane = null;
       if (Math.random() < 0.78) {
@@ -469,9 +607,23 @@ GAME_HTML = r"""
       if (Math.random() < tier.carrot + 0.2) {
         const free = lanes.filter(l => l !== obLane);
         const cl = free[Math.floor(Math.random()*free.length)];
-        entities.push({ kind: Math.random() < 0.12 ? 'gold' : 'carrot', lane: cl, y: SKY_H - 36, bob: Math.random()*6 });
+        entities.push({ kind: Math.random() < 0.12 ? 'gold' : 'carrot', lane: cl, y: obLane !== null ? SKY_H - 64 : SKY_H - 36, bob: Math.random()*6 });
       }
     }
+  }
+
+  function drawPyramid(x, baseY, w, h) {
+    for (let row = 0; row < h; row += 4) {
+      const inset = Math.floor((row / h) * (w * 0.5));
+      const rw = Math.max(4, w - inset * 2);
+      const half = Math.ceil(rw * 0.55);
+      ctx.fillStyle = '#E09F4B';
+      ctx.fillRect(x + inset, baseY - row - 4, half, 4);
+      ctx.fillStyle = '#A86424';
+      ctx.fillRect(x + inset + half, baseY - row - 4, Math.max(0, rw - half), 4);
+    }
+    ctx.fillStyle = '#F5C478';
+    ctx.fillRect(x + Math.floor(w * 0.46), baseY - h + 4, 6, 4);
   }
 
   let last = performance.now(), hudT = 0;
@@ -484,16 +636,16 @@ GAME_HTML = r"""
       runT += dt * 7; scroll = (scroll + dt * 150) % 64;
     } else if (state === 'PLAYING') {
       elapsed += dt;
-      timeLeft = Math.max(0, DURATION - elapsed);
-      const tier = TIERS[Math.min(TIERS.length - 1, Math.floor(elapsed / 12))];
+      timeLeft = mode === 'endless' ? DURATION : Math.max(0, DURATION - elapsed);
+      const tier = getDiff();
       if (tier.level > level) {
         level = tier.level;
-        banner = 'LV.' + tier.level + ' ' + tier.label + '！';
+        banner = mode === 'endless' ? 'SPEED UP! LV.' + tier.level + ' (' + (tier.speed/BASE_SPEED).toFixed(1) + 'x)' : 'LV.' + tier.level + ' ' + tier.label + '！';
         bannerT = 1.6; anger = 1.3;
         [440,554,659,880].forEach((n,i)=>tone(n,0.08,'square',0.07,i*0.065));
       }
       scroll = (scroll + dt * tier.speed) % 64;
-      runT += dt * (8 + level * 1.8);
+      runT += dt * (8 + Math.min(10, level * 1.6));
       if (invuln > 0) invuln = Math.max(0, invuln - dt);
       if (hurt > 0) hurt = Math.max(0, hurt - dt);
       if (anger > 0) anger = Math.max(0, anger - dt);
@@ -510,15 +662,20 @@ GAME_HTML = r"""
         ent.bob += dt * 7;
         if (ent.dead) continue;
         const ex = laneX(ent.lane);
-        if (Math.abs(playerX - ex) < 34 && ent.y + 18 >= PLAYER_Y - 20 && ent.y - 18 <= PLAYER_Y + 22) {
-          if (ent.kind === 'carrot' || ent.kind === 'gold') {
+        const isCarrot = ent.kind === 'carrot' || ent.kind === 'gold';
+        const hitX = isCarrot ? 38 : 20;
+        const hitTop = isCarrot ? PLAYER_Y - 22 : PLAYER_Y - 12;
+        const hitBot = isCarrot ? PLAYER_Y + 24 : PLAYER_Y + 14;
+        const halfH = isCarrot ? 20 : 12;
+        if (Math.abs(playerX - ex) < hitX && ent.y + halfH >= hitTop && ent.y - halfH <= hitBot) {
+          if (isCarrot) {
             ent.dead = true;
             combo++; maxCombo = Math.max(maxCombo, combo);
             carrots++;
             const mult = Math.min(4, 1 + Math.floor(combo / 5));
             const pts = (ent.kind === 'gold' ? 300 : 100) * mult;
             score += pts;
-            if (score > bestScore) { bestScore = score; localStorage.setItem(BEST_KEY, String(bestScore)); }
+            if (score > getBest(mode)) setBest(mode, score);
             if (ent.kind === 'gold') [587,784,1046,1318].forEach((n,i)=>tone(n,0.07,'square',0.08,i*0.055));
             else { tone(659+combo*25,0.06,'square',0.07,0); tone(988+combo*25,0.1,'square',0.07,0.05); }
             texts.push({ x: ex, y: PLAYER_Y - 32, t: '+' + pts, c: ent.kind === 'gold' ? '#FDE047' : '#FFF', l: 0.7 });
@@ -533,42 +690,62 @@ GAME_HTML = r"""
       entities = entities.filter(e => !e.dead && e.y < CANVAS_H + 50);
       texts = texts.filter(t => { t.y -= 38 * dt; t.l -= dt; return t.l > 0; });
 
-      if (timeLeft <= 0 && state === 'PLAYING') {
+      if (mode !== 'endless' && timeLeft <= 0 && state === 'PLAYING') {
         score += lives * 500;
-        if (score > bestScore) { bestScore = score; localStorage.setItem(BEST_KEY, String(bestScore)); }
+        if (score > getBest(mode)) setBest(mode, score);
         endGame(true);
       }
       hudT += dt;
       if (hudT >= 0.08) { hudT = 0; syncHud(); }
     }
 
-    // Draw
+    const theme = MODE_INFO[mode].theme;
     ctx.imageSmoothingEnabled = false;
-    ctx.fillStyle = '#5C94FC'; ctx.fillRect(0, 0, CANVAS_W, SKY_H);
-    ctx.fillStyle = '#198E19'; ctx.fillRect(28, SKY_H - 22, 64, 22); ctx.fillRect(240, SKY_H - 28, 76, 28);
-    ctx.fillStyle = '#FFF';
-    ctx.fillRect(((60+cloudX)%(CANVAS_W+60))-50, 20, 36, 12);
-    ctx.fillRect(((230+cloudX*0.7)%(CANVAS_W+60))-50, 34, 40, 12);
-    ctx.fillStyle = '#1B1410'; ctx.fillRect(0, SKY_H - 4, CANVAS_W, 4);
+    if (theme === 'desert') {
+      ctx.fillStyle = '#F2A65A'; ctx.fillRect(0, 0, CANVAS_W, SKY_H - 22);
+      ctx.fillStyle = '#F9C97E'; ctx.fillRect(0, SKY_H - 22, CANVAS_W, 22);
+      ctx.fillStyle = '#FFF3B0'; ctx.fillRect(296, 12, 24, 24);
+      ctx.fillStyle = '#FDE047'; ctx.fillRect(300, 16, 16, 16);
+      drawPyramid(14, SKY_H, 108, 46);
+      drawPyramid(144, SKY_H, 76, 32);
+      drawPyramid(228, SKY_H, 116, 52);
+      ctx.fillStyle = '#FFF7E8';
+      ctx.fillRect(((60+cloudX)%(CANVAS_W+60))-50, 14, 36, 12);
+      ctx.fillRect(((210+cloudX*0.7)%(CANVAS_W+60))-50, 26, 40, 12);
+      ctx.fillStyle = '#4A2B13'; ctx.fillRect(0, SKY_H - 4, CANVAS_W, 4);
 
-    ctx.fillStyle = '#248A24';
-    ctx.fillRect(0, SKY_H, GRASS_W, CANVAS_H - SKY_H);
-    ctx.fillRect(CANVAS_W - GRASS_W, SKY_H, GRASS_W, CANVAS_H - SKY_H);
-    ctx.fillStyle = '#D9A75A'; ctx.fillRect(GRASS_W, SKY_H, ROAD_W, CANVAS_H - SKY_H);
-    ctx.fillStyle = '#CE9A4D'; ctx.fillRect(GRASS_W + LANE_W, SKY_H, LANE_W, CANVAS_H - SKY_H);
+      ctx.fillStyle = '#C97B36';
+      ctx.fillRect(0, SKY_H, GRASS_W, CANVAS_H - SKY_H);
+      ctx.fillRect(CANVAS_W - GRASS_W, SKY_H, GRASS_W, CANVAS_H - SKY_H);
+      ctx.fillStyle = '#EAD09A'; ctx.fillRect(GRASS_W, SKY_H, ROAD_W, CANVAS_H - SKY_H);
+      ctx.fillStyle = '#DFC182'; ctx.fillRect(GRASS_W + LANE_W, SKY_H, LANE_W, CANVAS_H - SKY_H);
+    } else {
+      ctx.fillStyle = '#5C94FC'; ctx.fillRect(0, 0, CANVAS_W, SKY_H);
+      ctx.fillStyle = '#198E19'; ctx.fillRect(28, SKY_H - 22, 64, 22); ctx.fillRect(240, SKY_H - 28, 76, 28);
+      ctx.fillStyle = '#FFF';
+      ctx.fillRect(((60+cloudX)%(CANVAS_W+60))-50, 20, 36, 12);
+      ctx.fillRect(((230+cloudX*0.7)%(CANVAS_W+60))-50, 34, 40, 12);
+      ctx.fillStyle = '#1B1410'; ctx.fillRect(0, SKY_H - 4, CANVAS_W, 4);
+
+      ctx.fillStyle = '#248A24';
+      ctx.fillRect(0, SKY_H, GRASS_W, CANVAS_H - SKY_H);
+      ctx.fillRect(CANVAS_W - GRASS_W, SKY_H, GRASS_W, CANVAS_H - SKY_H);
+      ctx.fillStyle = '#D9A75A'; ctx.fillRect(GRASS_W, SKY_H, ROAD_W, CANVAS_H - SKY_H);
+      ctx.fillStyle = '#CE9A4D'; ctx.fillRect(GRASS_W + LANE_W, SKY_H, LANE_W, CANVAS_H - SKY_H);
+    }
 
     if (state === 'PLAYING') {
-      ctx.fillStyle = 'rgba(255,255,255,0.14)';
+      ctx.fillStyle = theme === 'desert' ? 'rgba(255,255,255,0.22)' : 'rgba(255,255,255,0.14)';
       ctx.fillRect(GRASS_W + lane * LANE_W + 4, PLAYER_Y - 34, LANE_W - 8, 68);
     }
 
     const off = Math.floor(scroll);
     for (let y = SKY_H - 64 + off; y < CANVAS_H + 32; y += 64) {
       if (y >= SKY_H) {
-        ctx.fillStyle = '#F8E6BE';
+        ctx.fillStyle = theme === 'desert' ? '#FFF5DC' : '#F8E6BE';
         ctx.fillRect(GRASS_W + LANE_W - 2, y, 4, 28);
         ctx.fillRect(GRASS_W + LANE_W * 2 - 2, y, 4, 28);
-        ctx.fillStyle = '#4CE04C';
+        ctx.fillStyle = theme === 'desert' ? '#E69F58' : '#4CE04C';
         ctx.fillRect(12, y + 10, 12, 6);
         ctx.fillRect(CANVAS_W - 24, y + 24, 12, 6);
       }
@@ -609,17 +786,17 @@ GAME_HTML = r"""
 
     if (bannerT > 0 && state === 'PLAYING') {
       ctx.fillStyle = 'rgba(18,22,32,0.85)';
-      ctx.fillRect(36, 120, CANVAS_W - 72, 42);
+      ctx.fillRect(30, 120, CANVAS_W - 60, 42);
       ctx.strokeStyle = '#FACC15'; ctx.lineWidth = 3;
-      ctx.strokeRect(36, 120, CANVAS_W - 72, 42);
-      ctx.font = '16px "DotGothic16", monospace';
+      ctx.strokeRect(30, 120, CANVAS_W - 60, 42);
+      ctx.font = '15px "DotGothic16", monospace';
       ctx.fillStyle = '#FACC15';
       ctx.fillText(banner, CANVAS_W / 2, 147);
     }
 
     requestAnimationFrame(loop);
   }
-  syncHud();
+  syncModeCard();
   requestAnimationFrame(loop);
 })();
 </script>
